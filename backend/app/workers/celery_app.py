@@ -1,5 +1,6 @@
-from celery import Celery
 import os
+
+from celery import Celery
 
 # Create the Celery app
 celery_app = Celery(
@@ -15,6 +16,7 @@ celery_app.conf.update(
     timezone="Asia/Kolkata",
     enable_utc=True,
 )
+
 
 # Placeholder task — real tasks will be added per feature
 @celery_app.task

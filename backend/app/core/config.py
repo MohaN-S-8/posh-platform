@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings
 from typing import List
+
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     # Database
@@ -21,8 +23,9 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
 
     class Config:
-        env_file = ".env"          # reads from the .env file automatically
+        env_file = ".env"  # reads from the .env file automatically
         case_sensitive = True
+
 
 # Create a single instance used throughout the app
 settings = Settings()

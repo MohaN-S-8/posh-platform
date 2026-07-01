@@ -1,8 +1,10 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
-import sys
 import os
+import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # This adds the backend/ folder to Python's path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,9 +15,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.db.base import Base
 
 # Import every model so Alembic knows about their tables
-from app.models.company import CompanyMaster
-from app.models.role import RoleMaster
-from app.models.user import UserMaster
+from app.models.company import CompanyMaster  # noqa: F401
+from app.models.role import RoleMaster  # noqa: F401
+from app.models.user import UserMaster  # noqa: F401
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 config = context.config
@@ -24,6 +27,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -35,6 +39,7 @@ def run_migrations_offline() -> None:
     )
     with context.begin_transaction():
         context.run_migrations()
+
 
 def run_migrations_online() -> None:
     connectable = engine_from_config(
@@ -49,6 +54,7 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

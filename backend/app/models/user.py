@@ -1,12 +1,25 @@
-from sqlalchemy import Column, BigInteger, Integer, String, Enum, DateTime, Date, ForeignKey
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.sql import func
+
 from app.db.base import Base
+
 
 class UserMaster(Base):
     __tablename__ = "user_master"
 
     user_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("company_master.company_id"), nullable=False)
+    company_id = Column(
+        Integer, ForeignKey("company_master.company_id"), nullable=False
+    )
     employee_id = Column(String(30), unique=True, nullable=False)
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100))
@@ -21,7 +34,7 @@ class UserMaster(Base):
     password_hash = Column(String(255))
     language_preference = Column(Integer)
     status = Column(Enum("Active", "Inactive"), default="Active")
-    is_deleted = Column(String(1), default="N")   # soft delete
+    is_deleted = Column(String(1), default="N")  # soft delete
     joining_date = Column(Date)
     created_date = Column(DateTime, server_default=func.now())
     updated_date = Column(DateTime, server_default=func.now(), onupdate=func.now())

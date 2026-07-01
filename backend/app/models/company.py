@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, Text
+from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
 from sqlalchemy.sql import func
+
 from app.db.base import Base
+
 
 class CompanyMaster(Base):
     __tablename__ = "company_master"
@@ -18,6 +20,6 @@ class CompanyMaster(Base):
     contact_email = Column(String(100))
     contact_mobile = Column(String(20))
     status = Column(Enum("Active", "Inactive"), default="Active")
-    is_deleted = Column(String(1), default="N")   # soft delete
+    is_deleted = Column(String(1), default="N")  # soft delete
     created_date = Column(DateTime, server_default=func.now())
     updated_date = Column(DateTime, server_default=func.now(), onupdate=func.now())
