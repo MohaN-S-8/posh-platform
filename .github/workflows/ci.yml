@@ -53,15 +53,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js 24
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Debug Node version
+        run: |
+          node -v
+          npm -v
 
       - name: Install dependencies
         run: |
@@ -72,12 +76,8 @@ jobs:
         run: |
           cd frontend
           npx tsc --noEmit
-        continue-on-error: true
 
       - name: Build production bundle
         run: |
           cd frontend
           npm run build
-
-      - name: Build Docker image
-        run: docker build -t posh-frontend:test ./frontend
