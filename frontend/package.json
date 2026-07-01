@@ -27,7 +27,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.17",
@@ -37,7 +37,7 @@
     "@typescript-eslint/parser": "^8.62.1",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.9",
-    "eslint": "^10.0.0",
+    "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -49,6 +49,6 @@
     "vitest": "^4.1.9"
   },
   "engines": {
-    "node": ">=18 <25"
+    "node": ">=18 <=22"
   }
 }
