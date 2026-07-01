@@ -31,6 +31,4 @@ async def health_check():
 # Root endpoint
 @app.get("/")
 async def root():
-    return {
-        "message": "POSH Platform API is running. Visit /docs for API documentation."
-    }
+    return {"message": "POSH Platform API is running. Visit /docs for API documentation."}
