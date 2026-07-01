@@ -16,6 +16,7 @@ build/
 .ruff_cache/
 htmlcov/
 .coverage
+.env.example
 
 # Node.js / React
 node_modules/
