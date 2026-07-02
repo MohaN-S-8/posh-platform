@@ -1,7 +1,7 @@
 """initial_tables_company_role_user
 
 Revision ID: d04a5453da29
-Revises: 
+Revises:
 Create Date: 2026-07-01 15:28:44.396546
 
 """
