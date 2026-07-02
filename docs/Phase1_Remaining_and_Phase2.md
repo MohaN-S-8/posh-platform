@@ -1074,6 +1074,10 @@ git push origin develop
 
 ---
 
+# DONE
+
+---
+
 # PHASE 2 — CONTENT & LEARNING (Week 6–9)
 
 **What we build:** Video upload, secure streaming, video player enforcement, assessments, progress tracking.
@@ -1425,6 +1429,7 @@ Add `boto3` to `backend/requirements.txt`:
 
 ```
 boto3==1.35.0
+python-magic-bin
 ```
 
 ---
@@ -2032,6 +2037,8 @@ def test_assessment_blocked_before_video_complete():
 ```bash
 cd backend
 black .
+ruff check .
+ruff check --fix .
 ruff check .
 pytest tests/ -v
 cd ..

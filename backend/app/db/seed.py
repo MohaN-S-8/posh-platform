@@ -46,6 +46,37 @@ async def seed():
             )
         )
 
+        # ── 3. Languages ──────────────────────────────────────────────────
+        await db.execute(
+            text(
+                """
+                INSERT IGNORE INTO language_master (language_id, language_name)
+                VALUES
+                    (1, 'English'),
+                    (2, 'Hindi'),
+                    (3, 'Tamil'),
+                    (4, 'Telugu'),
+                    (5, 'Malayalam'),
+                    (6, 'Kannada')
+            """
+            )
+        )
+
+        # ── 4. Video Categories ───────────────────────────────────────────
+        await db.execute(
+            text(
+                """
+                INSERT IGNORE INTO video_category (category_id, category_name)
+                VALUES
+                    (1, 'POSH Awareness'),
+                    (2, 'Workplace Conduct'),
+                    (3, 'Case Studies'),
+                    (4, 'Reporting Procedures'),
+                    (5, 'Annual Refresher')
+            """
+            )
+        )
+
         await db.commit()
         print("✅ Seed complete — roles and default company inserted.")
 
