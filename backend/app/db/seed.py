@@ -2,10 +2,12 @@
 Seed script — run once to populate reference data.
 Run with: python -m app.db.seed
 """
+
 import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import text
 import os
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -20,24 +22,28 @@ async def seed():
     async with AsyncSessionLocal() as db:
         # ── 1. Roles ──────────────────────────────────────────────────────
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT IGNORE INTO role_master (role_id, role_name)
                 VALUES
                     (1, 'Super Admin'),
                     (2, 'Company Admin'),
                     (3, 'HR'),
                     (4, 'Employee')
-            """)
+            """
+            )
         )
 
         # ── 2. Default company (needed for signup FK) ─────────────────────
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT IGNORE INTO company_master
                     (company_id, company_code, company_name, status)
                 VALUES
                     (1, 'DEFAULT', 'Default Company', 'Active')
-            """)
+            """
+            )
         )
 
         await db.commit()
