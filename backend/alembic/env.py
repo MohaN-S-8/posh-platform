@@ -6,20 +6,19 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# This adds the backend/ folder to Python's path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# ── CRITICAL: Import Base AND all models ──────────────────────────────────────
-# Alembic can only detect tables that have been imported before it reads metadata.
-# If you add a new model file later, add its import here too.
 from app.db.base import Base
-
-# Import every model so Alembic knows about their tables
+from app.models.auth import (  # noqa: F401
+    AccountLockout,
+    LoginAttempts,
+    OTPVerification,
+    PasswordResetTokens,
+    RefreshTokens,
+)
 from app.models.company import CompanyMaster  # noqa: F401
 from app.models.role import RoleMaster  # noqa: F401
 from app.models.user import UserMaster  # noqa: F401
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 config = context.config
 

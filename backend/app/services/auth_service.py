@@ -178,3 +178,143 @@ class AuthService:
 
         if lockout.failed_attempts >= MAX_FAILED_ATTEMPTS:
             lockout.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+
+    async def logout(self, db: AsyncSession, user_id: int, refresh_token: str) -> dict:
+        """Revoke the refresh token. Access token expires naturally after 15 min."""
+        import hashlib
+
+        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+
+        result = await db.execute(
+            select(RefreshTokens).where(
+                RefreshTokens.user_id == user_id,
+                RefreshTokens.token_hash == token_hash,
+                RefreshTokens.revoked == False,  # noqa: E712
+            )
+        )
+        token_record = result.scalar_one_or_none()
+
+        if token_record:
+            token_record.revoked = True
+            await db.commit()
+
+        return {"message": "Logged out successfully."}
+
+    async def refresh_access_token(self, db: AsyncSession, refresh_token: str) -> dict:
+        """Exchange a valid refresh token for a new access token."""
+        import hashlib
+        from datetime import datetime, timezone
+
+        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+
+        result = await db.execute(
+            select(RefreshTokens).where(
+                RefreshTokens.token_hash == token_hash,
+                RefreshTokens.revoked == False,  # noqa: E712
+                RefreshTokens.expires_at > datetime.now(timezone.utc),
+            )
+        )
+        token_record = result.scalar_one_or_none()
+
+        if not token_record:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired refresh token.",
+            )
+
+        # Rotate the refresh token (old one revoked, new one issued)
+        token_record.revoked = True
+
+        raw_refresh, hashed_refresh = create_refresh_token()
+        new_record = RefreshTokens(
+            user_id=token_record.user_id,
+            token_hash=hashed_refresh,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+        db.add(new_record)
+
+        # Fetch user for new access token
+        user_result = await db.execute(
+            select(UserMaster).where(UserMaster.user_id == token_record.user_id)
+        )
+        user = user_result.scalar_one()
+
+        access_token = create_access_token(
+            {
+                "user_id": user.user_id,
+                "company_id": user.company_id,
+                "role_id": user.role_id,
+            }
+        )
+        await db.commit()
+
+        return {
+            "access_token": access_token,
+            "refresh_token": raw_refresh,
+        }
+
+    async def forgot_password(self, db: AsyncSession, email: str) -> dict:
+        """Send password reset link to email."""
+        from app.models.auth import PasswordResetTokens
+
+        result = await db.execute(select(UserMaster).where(UserMaster.email == email.lower()))
+        user = result.scalar_one_or_none()
+
+        # Always return same message — don't reveal if email exists (security)
+        if not user:
+            return {"message": "If this email is registered, you will receive reset instructions."}
+
+        # Generate reset token
+        raw_token, token_hash = create_refresh_token()  # reuse same logic
+
+        reset_record = PasswordResetTokens(
+            user_id=user.user_id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db.add(reset_record)
+        await db.commit()
+
+        # TODO: Send email with reset link (Celery task in Phase 3)
+        # Reset URL: http://localhost:3000/reset-password?token={raw_token}
+        return {
+            "message": "If this email is registered, you will receive reset instructions.",
+            "dev_reset_token": raw_token,  # REMOVE IN PRODUCTION
+        }
+
+    async def reset_password(self, db: AsyncSession, token: str, new_password: str) -> dict:
+        """Reset password using the token from email."""
+        import hashlib
+
+        from app.models.auth import PasswordResetTokens
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        result = await db.execute(
+            select(PasswordResetTokens).where(
+                PasswordResetTokens.token_hash == token_hash,
+                PasswordResetTokens.used == False,  # noqa: E712
+                PasswordResetTokens.expires_at > datetime.now(timezone.utc),
+            )
+        )
+        reset_record = result.scalar_one_or_none()
+
+        if not reset_record:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset token.",
+            )
+
+        # Update password
+        new_hash = hash_password(new_password)
+        await db.execute(
+            update(UserMaster)
+            .where(UserMaster.user_id == reset_record.user_id)
+            .values(password_hash=new_hash)
+        )
+
+        # Mark token as used
+        reset_record.used = True
+        await db.commit()
+
+        return {"message": "Password reset successfully. You can now log in."}
