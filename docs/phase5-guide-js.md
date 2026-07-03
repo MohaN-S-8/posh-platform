@@ -4,34 +4,34 @@
 
 ## Where You Are
 
-| Phase | Status |
-|---|---|
-| Phase 0 — Foundations | ✅ Complete |
-| Phase 1 — Auth + User Management | ✅ Complete |
-| Phase 2 — Video + Assessments | ✅ Complete |
-| Phase 3 — HR Portal | ✅ Complete |
-| Phase 4 — Certificates + Analytics | ✅ Complete |
-| **Phase 5A — Close Backend Gaps** | ⬜ This document |
+| Phase                                      | Status           |
+| ------------------------------------------ | ---------------- |
+| Phase 0 — Foundations                      | ✅ Complete      |
+| Phase 1 — Auth + User Management           | ✅ Complete      |
+| Phase 2 — Video + Assessments              | ✅ Complete      |
+| Phase 3 — HR Portal                        | ✅ Complete      |
+| Phase 4 — Certificates + Analytics         | ✅ Complete      |
+| **Phase 5A — Close Backend Gaps**          | ⬜ This document |
 | **Phase 5B — React Frontend (JavaScript)** | ⬜ This document |
-| **Phase 5C — Security Hardening** | ⬜ This document |
-| **Phase 5D — Production Deployment** | ⬜ This document |
+| **Phase 5C — Security Hardening**          | ⬜ This document |
+| **Phase 5D — Production Deployment**       | ⬜ This document |
 
 ## All Known Gaps to Fix
 
-| File | Gap | Fix in Step |
-|---|---|---|
-| `auth_service.py` signup | `dev_otp` returned in response | Step 46 |
-| `auth_service.py` forgot_password | `dev_reset_token` in response | Step 46 |
-| `user_service.py` create | Hardcoded `Temp@1234` password | Step 46 |
-| `assessment_service.py` | Certificate generated inline, not Celery | Step 47 |
-| `auth_service.py` signup | OTP email never actually sent | Step 46 |
-| `user_service.py` create | Welcome email never sent | Step 46 |
+| File                              | Gap                                      | Fix in Step |
+| --------------------------------- | ---------------------------------------- | ----------- |
+| `auth_service.py` signup          | `dev_otp` returned in response           | Step 46     |
+| `auth_service.py` forgot_password | `dev_reset_token` in response            | Step 46     |
+| `user_service.py` create          | Hardcoded `Temp@1234` password           | Step 46     |
+| `assessment_service.py`           | Certificate generated inline, not Celery | Step 47     |
+| `auth_service.py` signup          | OTP email never actually sent            | Step 46     |
+| `user_service.py` create          | Welcome email never sent                 | Step 46     |
 
 ---
 
 # PHASE 5A — CLOSE BACKEND GAPS
 
-*(Unchanged — backend is Python, not affected by the JS/TS conversion)*
+_(Unchanged — backend is Python, not affected by the JS/TS conversion)_
 
 ---
 
@@ -547,8 +547,8 @@ import axios from "axios";
 
 // All API calls go through this instance
 const apiClient = axios.create({
-  baseURL: "/api/v1",        // proxied to backend by Nginx
-  withCredentials: true,     // sends cookies (JWT tokens) automatically
+  baseURL: "/api/v1", // proxied to backend by Nginx
+  withCredentials: true, // sends cookies (JWT tokens) automatically
   headers: {
     "Content-Type": "application/json",
   },
@@ -581,7 +581,7 @@ apiClient.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;
@@ -601,23 +601,22 @@ import apiClient from "./client";
 // LoginData:  { email, password }
 
 export const authApi = {
-  signup: (data) =>
-    apiClient.post("/auth/signup", data),
+  signup: (data) => apiClient.post("/auth/signup", data),
 
-  verifyOtp: (email, otp) =>
-    apiClient.post("/auth/verify-otp", { email, otp }),
+  verifyOtp: (email, otp) => apiClient.post("/auth/verify-otp", { email, otp }),
 
-  login: (data) =>
-    apiClient.post("/auth/login", data),
+  login: (data) => apiClient.post("/auth/login", data),
 
-  logout: () =>
-    apiClient.post("/auth/logout"),
+  logout: () => apiClient.post("/auth/logout"),
 
-  forgotPassword: (email) =>
-    apiClient.post("/auth/forgot-password", { email }),
+  forgotPassword: (email) => apiClient.post("/auth/forgot-password", { email }),
 
   resetPassword: (token, new_password, confirm_password) =>
-    apiClient.post("/auth/reset-password", { token, new_password, confirm_password }),
+    apiClient.post("/auth/reset-password", {
+      token,
+      new_password,
+      confirm_password,
+    }),
 };
 ```
 
@@ -1053,7 +1052,9 @@ export function LoginPage() {
               </button>
             </div>
             {errors.password && (
-              <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+              <p
+                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
+              >
                 {errors.password.message}
               </p>
             )}
@@ -1139,9 +1140,7 @@ const signupSchema = z
       .min(2, "Minimum 2 characters")
       .max(50, "Maximum 50 characters")
       .regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
-    last_name: z
-      .string()
-      .regex(/^[a-zA-Z\s]*$/, "Only letters allowed"),
+    last_name: z.string().regex(/^[a-zA-Z\s]*$/, "Only letters allowed"),
     email: z
       .string()
       .min(1, "Email is required")
@@ -1185,7 +1184,9 @@ export function SignupPage() {
       // Navigate to OTP page with email in state
       navigate("/verify-otp", { state: { email: data.email } });
     } catch (err) {
-      setError(err.response?.data?.detail || "Signup failed. Please try again.");
+      setError(
+        err.response?.data?.detail || "Signup failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -1227,7 +1228,9 @@ export function SignupPage() {
           maxWidth: "480px",
         }}
       >
-        <h1 style={{ color: "#1a3c5e", marginBottom: "8px", textAlign: "center" }}>
+        <h1
+          style={{ color: "#1a3c5e", marginBottom: "8px", textAlign: "center" }}
+        >
           Create Account
         </h1>
         <p style={{ color: "#666", textAlign: "center", marginBottom: "32px" }}>
@@ -1235,68 +1238,127 @@ export function SignupPage() {
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+            }}
+          >
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: 500,
+                }}
+              >
                 First Name *
               </label>
-              <input {...register("first_name")} style={inputStyle(!!errors.first_name)} />
-              {errors.first_name && <p style={errorStyle}>{errors.first_name.message}</p>}
+              <input
+                {...register("first_name")}
+                style={inputStyle(!!errors.first_name)}
+              />
+              {errors.first_name && (
+                <p style={errorStyle}>{errors.first_name.message}</p>
+              )}
             </div>
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: 500,
+                }}
+              >
                 Last Name
               </label>
-              <input {...register("last_name")} style={inputStyle(!!errors.last_name)} />
-              {errors.last_name && <p style={errorStyle}>{errors.last_name.message}</p>}
+              <input
+                {...register("last_name")}
+                style={inputStyle(!!errors.last_name)}
+              />
+              {errors.last_name && (
+                <p style={errorStyle}>{errors.last_name.message}</p>
+              )}
             </div>
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+            <label
+              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
+            >
               Email Address *
             </label>
-            <input type="email" {...register("email")} style={inputStyle(!!errors.email)} />
+            <input
+              type="email"
+              {...register("email")}
+              style={inputStyle(!!errors.email)}
+            />
             {errors.email && <p style={errorStyle}>{errors.email.message}</p>}
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+            <label
+              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
+            >
               Mobile Number *
             </label>
-            <input type="tel" {...register("mobile")} placeholder="10 digit number"
-              style={inputStyle(!!errors.mobile)} />
+            <input
+              type="tel"
+              {...register("mobile")}
+              placeholder="10 digit number"
+              style={inputStyle(!!errors.mobile)}
+            />
             {errors.mobile && <p style={errorStyle}>{errors.mobile.message}</p>}
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+            <label
+              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
+            >
               Password *
             </label>
-            <input type="password" {...register("password")} style={inputStyle(!!errors.password)} />
-            {errors.password && <p style={errorStyle}>{errors.password.message}</p>}
+            <input
+              type="password"
+              {...register("password")}
+              style={inputStyle(!!errors.password)}
+            />
+            {errors.password && (
+              <p style={errorStyle}>{errors.password.message}</p>
+            )}
             <p style={{ fontSize: "11px", color: "#999", marginTop: "4px" }}>
               8–15 characters, uppercase, lowercase, number, special character
             </p>
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+            <label
+              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
+            >
               Confirm Password *
             </label>
-            <input type="password" {...register("confirm_password")}
-              style={inputStyle(!!errors.confirm_password)} />
+            <input
+              type="password"
+              {...register("confirm_password")}
+              style={inputStyle(!!errors.confirm_password)}
+            />
             {errors.confirm_password && (
               <p style={errorStyle}>{errors.confirm_password.message}</p>
             )}
           </div>
 
           {error && (
-            <div style={{
-              background: "#fdf0f0", border: "1px solid #e74c3c",
-              borderRadius: "6px", padding: "10px 14px",
-              color: "#e74c3c", fontSize: "14px", marginTop: "16px",
-            }}>
+            <div
+              style={{
+                background: "#fdf0f0",
+                border: "1px solid #e74c3c",
+                borderRadius: "6px",
+                padding: "10px 14px",
+                color: "#e74c3c",
+                fontSize: "14px",
+                marginTop: "16px",
+              }}
+            >
               {error}
             </div>
           )}
@@ -1305,10 +1367,15 @@ export function SignupPage() {
             type="submit"
             disabled={!isValid || loading}
             style={{
-              width: "100%", padding: "12px", marginTop: "24px",
+              width: "100%",
+              padding: "12px",
+              marginTop: "24px",
               background: !isValid || loading ? "#93b8d4" : "#1a3c5e",
-              color: "white", border: "none", borderRadius: "6px",
-              fontSize: "16px", fontWeight: 600,
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              fontSize: "16px",
+              fontWeight: 600,
               cursor: !isValid || loading ? "not-allowed" : "pointer",
             }}
           >
@@ -1350,9 +1417,9 @@ export function OTPPage() {
   const inputs = useRef([]);
 
   const handleChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return;   // digits only
+    if (!/^\d*$/.test(value)) return; // digits only
     const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);    // one digit per box
+    newOtp[index] = value.slice(-1); // one digit per box
     setOtp(newOtp);
     if (value && index < 5) inputs.current[index + 1]?.focus();
   };
@@ -1385,16 +1452,29 @@ export function OTPPage() {
   };
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex",
-      alignItems: "center", justifyContent: "center", background: "#f5f7fa",
-    }}>
-      <div style={{
-        background: "white", padding: "40px", borderRadius: "12px",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: "100%", maxWidth: "400px",
-        textAlign: "center",
-      }}>
-        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>Verify Your Email</h1>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f5f7fa",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "40px",
+          borderRadius: "12px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+          width: "100%",
+          maxWidth: "400px",
+          textAlign: "center",
+        }}
+      >
+        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>
+          Verify Your Email
+        </h1>
         <p style={{ color: "#666", marginBottom: "8px" }}>
           Enter the 6-digit code sent to
         </p>
@@ -1403,7 +1483,14 @@ export function OTPPage() {
         </p>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginBottom: "24px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              justifyContent: "center",
+              marginBottom: "24px",
+            }}
+          >
             {otp.map((digit, i) => (
               <input
                 key={i}
@@ -1416,9 +1503,13 @@ export function OTPPage() {
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 aria-label={`OTP digit ${i + 1}`}
                 style={{
-                  width: "48px", height: "56px", textAlign: "center",
-                  fontSize: "24px", fontWeight: 700,
-                  border: "2px solid #ddd", borderRadius: "8px",
+                  width: "48px",
+                  height: "56px",
+                  textAlign: "center",
+                  fontSize: "24px",
+                  fontWeight: 700,
+                  border: "2px solid #ddd",
+                  borderRadius: "8px",
                   outline: "none",
                 }}
               />
@@ -1433,11 +1524,19 @@ export function OTPPage() {
             type="submit"
             disabled={otp.join("").length !== 6 || loading}
             style={{
-              width: "100%", padding: "12px",
-              background: otp.join("").length !== 6 || loading ? "#93b8d4" : "#1a3c5e",
-              color: "white", border: "none", borderRadius: "6px",
-              fontSize: "16px", fontWeight: 600,
-              cursor: otp.join("").length !== 6 || loading ? "not-allowed" : "pointer",
+              width: "100%",
+              padding: "12px",
+              background:
+                otp.join("").length !== 6 || loading ? "#93b8d4" : "#1a3c5e",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              fontSize: "16px",
+              fontWeight: 600,
+              cursor:
+                otp.join("").length !== 6 || loading
+                  ? "not-allowed"
+                  : "pointer",
             }}
           >
             {loading ? "Verifying..." : "Verify Email"}
@@ -1446,7 +1545,9 @@ export function OTPPage() {
 
         <p style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
           Didn't receive the code?{" "}
-          <Link to="/signup" style={{ color: "#1a3c5e" }}>Go back to signup</Link>
+          <Link to="/signup" style={{ color: "#1a3c5e" }}>
+            Go back to signup
+          </Link>
         </p>
       </div>
     </div>
@@ -1474,8 +1575,11 @@ export function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isValid } } =
-    useForm({ resolver: zodResolver(schema), mode: "onChange" });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm({ resolver: zodResolver(schema), mode: "onChange" });
 
   const onSubmit = async (data) => {
     setLoading(true);
@@ -1488,48 +1592,82 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex",
-      alignItems: "center", justifyContent: "center", background: "#f5f7fa",
-    }}>
-      <div style={{
-        background: "white", padding: "40px", borderRadius: "12px",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: "100%", maxWidth: "420px",
-      }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f5f7fa",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "40px",
+          borderRadius: "12px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+          width: "100%",
+          maxWidth: "420px",
+        }}
+      >
         {submitted ? (
           <div style={{ textAlign: "center" }}>
             <h2 style={{ color: "#27ae60" }}>✓ Email Sent</h2>
             <p style={{ color: "#666", marginTop: "12px" }}>
-              If your email is registered, you will receive password reset instructions.
+              If your email is registered, you will receive password reset
+              instructions.
             </p>
-            <Link to="/login" style={{
-              display: "inline-block", marginTop: "24px",
-              color: "#1a3c5e", fontWeight: 600,
-            }}>
+            <Link
+              to="/login"
+              style={{
+                display: "inline-block",
+                marginTop: "24px",
+                color: "#1a3c5e",
+                fontWeight: 600,
+              }}
+            >
               Back to Login
             </Link>
           </div>
         ) : (
           <>
-            <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>Forgot Password</h1>
+            <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>
+              Forgot Password
+            </h1>
             <p style={{ color: "#666", marginBottom: "32px" }}>
               Enter your email and we'll send you reset instructions.
             </p>
             <form onSubmit={handleSubmit(onSubmit)}>
-              <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontWeight: 500,
+                }}
+              >
                 Email Address *
               </label>
               <input
                 type="email"
                 {...register("email")}
                 style={{
-                  width: "100%", padding: "10px 14px",
+                  width: "100%",
+                  padding: "10px 14px",
                   border: `1px solid ${errors.email ? "#e74c3c" : "#ddd"}`,
-                  borderRadius: "6px", fontSize: "14px", boxSizing: "border-box",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  boxSizing: "border-box",
                 }}
               />
               {errors.email && (
-                <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+                <p
+                  style={{
+                    color: "#e74c3c",
+                    fontSize: "12px",
+                    marginTop: "4px",
+                  }}
+                >
                   {errors.email.message}
                 </p>
               )}
@@ -1537,10 +1675,15 @@ export function ForgotPasswordPage() {
                 type="submit"
                 disabled={!isValid || loading}
                 style={{
-                  width: "100%", padding: "12px", marginTop: "24px",
+                  width: "100%",
+                  padding: "12px",
+                  marginTop: "24px",
                   background: !isValid || loading ? "#93b8d4" : "#1a3c5e",
-                  color: "white", border: "none", borderRadius: "6px",
-                  fontSize: "16px", fontWeight: 600,
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "16px",
+                  fontWeight: 600,
                   cursor: !isValid || loading ? "not-allowed" : "pointer",
                 }}
               >
@@ -1576,7 +1719,8 @@ const schema = z
   .object({
     new_password: z
       .string()
-      .min(8).max(15)
+      .min(8)
+      .max(15)
       .regex(/[A-Z]/, "Needs uppercase")
       .regex(/[a-z]/, "Needs lowercase")
       .regex(/[0-9]/, "Needs number")
@@ -1595,84 +1739,144 @@ export function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isValid } } =
-    useForm({ resolver: zodResolver(schema), mode: "onChange" });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm({ resolver: zodResolver(schema), mode: "onChange" });
 
   const onSubmit = async (data) => {
     setLoading(true);
     setError("");
     try {
-      await authApi.resetPassword(token, data.new_password, data.confirm_password);
-      navigate("/login", { state: { message: "Password reset successfully. Please log in." } });
+      await authApi.resetPassword(
+        token,
+        data.new_password,
+        data.confirm_password,
+      );
+      navigate("/login", {
+        state: { message: "Password reset successfully. Please log in." },
+      });
     } catch (err) {
-      setError(err.response?.data?.detail || "Reset failed. Token may have expired.");
+      setError(
+        err.response?.data?.detail || "Reset failed. Token may have expired.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex",
-      alignItems: "center", justifyContent: "center", background: "#f5f7fa",
-    }}>
-      <div style={{
-        background: "white", padding: "40px", borderRadius: "12px",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: "100%", maxWidth: "420px",
-      }}>
-        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>Reset Password</h1>
-        <p style={{ color: "#666", marginBottom: "32px" }}>Enter your new password below.</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f5f7fa",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "40px",
+          borderRadius: "12px",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+          width: "100%",
+          maxWidth: "420px",
+        }}
+      >
+        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>
+          Reset Password
+        </h1>
+        <p style={{ color: "#666", marginBottom: "32px" }}>
+          Enter your new password below.
+        </p>
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+            <label
+              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
+            >
               New Password *
             </label>
-            <input type="password" {...register("new_password")} style={{
-              width: "100%", padding: "10px 14px",
-              border: `1px solid ${errors.new_password ? "#e74c3c" : "#ddd"}`,
-              borderRadius: "6px", fontSize: "14px", boxSizing: "border-box",
-            }} />
+            <input
+              type="password"
+              {...register("new_password")}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: `1px solid ${errors.new_password ? "#e74c3c" : "#ddd"}`,
+                borderRadius: "6px",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
             {errors.new_password && (
-              <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+              <p
+                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
+              >
                 {errors.new_password.message}
               </p>
             )}
           </div>
 
           <div>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
+            <label
+              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
+            >
               Confirm Password *
             </label>
-            <input type="password" {...register("confirm_password")} style={{
-              width: "100%", padding: "10px 14px",
-              border: `1px solid ${errors.confirm_password ? "#e74c3c" : "#ddd"}`,
-              borderRadius: "6px", fontSize: "14px", boxSizing: "border-box",
-            }} />
+            <input
+              type="password"
+              {...register("confirm_password")}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: `1px solid ${errors.confirm_password ? "#e74c3c" : "#ddd"}`,
+                borderRadius: "6px",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
             {errors.confirm_password && (
-              <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+              <p
+                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
+              >
                 {errors.confirm_password.message}
               </p>
             )}
           </div>
 
           {error && (
-            <div style={{
-              background: "#fdf0f0", border: "1px solid #e74c3c",
-              borderRadius: "6px", padding: "10px 14px",
-              color: "#e74c3c", fontSize: "14px", marginTop: "16px",
-            }}>
+            <div
+              style={{
+                background: "#fdf0f0",
+                border: "1px solid #e74c3c",
+                borderRadius: "6px",
+                padding: "10px 14px",
+                color: "#e74c3c",
+                fontSize: "14px",
+                marginTop: "16px",
+              }}
+            >
               {error}
             </div>
           )}
 
           <button
-            type="submit" disabled={!isValid || loading}
+            type="submit"
+            disabled={!isValid || loading}
             style={{
-              width: "100%", padding: "12px", marginTop: "24px",
+              width: "100%",
+              padding: "12px",
+              marginTop: "24px",
               background: !isValid || loading ? "#93b8d4" : "#1a3c5e",
-              color: "white", border: "none", borderRadius: "6px",
-              fontSize: "16px", fontWeight: 600,
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              fontSize: "16px",
+              fontWeight: 600,
               cursor: !isValid || loading ? "not-allowed" : "pointer",
             }}
           >
@@ -1705,31 +1909,60 @@ export function AdminDashboard() {
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
 
-  const logout = () => { clearAuth(); navigate("/login"); };
+  const logout = () => {
+    clearAuth();
+    navigate("/login");
+  };
 
   return (
     <div style={{ padding: "40px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h1 style={{ color: "#1a3c5e" }}>Admin Portal</h1>
-        <button onClick={logout}
-          style={{ padding: "8px 20px", background: "#e74c3c", color: "white",
-                   border: "none", borderRadius: "6px", cursor: "pointer" }}>
+        <button
+          onClick={logout}
+          style={{
+            padding: "8px 20px",
+            background: "#e74c3c",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
           Logout
         </button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginTop: "32px" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "20px",
+          marginTop: "32px",
+        }}
+      >
         {[
           { label: "Companies", path: "/admin/companies" },
           { label: "Users", path: "/admin/users" },
           { label: "Videos", path: "/admin/videos" },
         ].map((item) => (
-          <div key={item.path}
+          <div
+            key={item.path}
             onClick={() => navigate(item.path)}
             style={{
-              background: "white", padding: "24px", borderRadius: "8px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.08)", cursor: "pointer",
+              background: "white",
+              padding: "24px",
+              borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              cursor: "pointer",
               borderLeft: "4px solid #1a3c5e",
-            }}>
+            }}
+          >
             <h3 style={{ color: "#1a3c5e" }}>{item.label}</h3>
           </div>
         ))}
@@ -1746,27 +1979,46 @@ Create similar placeholder files for all other portal pages:
 ```
 
 Create `frontend/src/features/admin/CompanyListPage.jsx`:
+
 ```jsx
 export function CompanyListPage() {
-  return <div style={{ padding: "40px" }}><h1>Company Management</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Company Management</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/admin/UserListPage.jsx`:
+
 ```jsx
 export function UserListPage() {
-  return <div style={{ padding: "40px" }}><h1>User Management</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>User Management</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/admin/VideoListPage.jsx`:
+
 ```jsx
 export function VideoListPage() {
-  return <div style={{ padding: "40px" }}><h1>Video Management</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Video Management</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/hr/HRDashboard.jsx`:
+
 ```jsx
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
@@ -1774,15 +2026,32 @@ import { useNavigate } from "react-router-dom";
 export function HRDashboard() {
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
-  const logout = () => { clearAuth(); navigate("/login"); };
+  const logout = () => {
+    clearAuth();
+    navigate("/login");
+  };
 
   return (
     <div style={{ padding: "40px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h1 style={{ color: "#1a3c5e" }}>HR Portal</h1>
-        <button onClick={logout}
-          style={{ padding: "8px 20px", background: "#e74c3c", color: "white",
-                   border: "none", borderRadius: "6px", cursor: "pointer" }}>
+        <button
+          onClick={logout}
+          style={{
+            padding: "8px 20px",
+            background: "#e74c3c",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
           Logout
         </button>
       </div>
@@ -1792,27 +2061,46 @@ export function HRDashboard() {
 ```
 
 Create `frontend/src/features/hr/BulkUploadPage.jsx`:
+
 ```jsx
 export function BulkUploadPage() {
-  return <div style={{ padding: "40px" }}><h1>Bulk Employee Upload</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Bulk Employee Upload</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/hr/TrainingAssignPage.jsx`:
+
 ```jsx
 export function TrainingAssignPage() {
-  return <div style={{ padding: "40px" }}><h1>Assign Training</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Assign Training</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/hr/CompliancePage.jsx`:
+
 ```jsx
 export function CompliancePage() {
-  return <div style={{ padding: "40px" }}><h1>Compliance Dashboard</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Compliance Dashboard</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/employee/EmployeeDashboard.jsx`:
+
 ```jsx
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
@@ -1820,15 +2108,32 @@ import { useNavigate } from "react-router-dom";
 export function EmployeeDashboard() {
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
-  const logout = () => { clearAuth(); navigate("/login"); };
+  const logout = () => {
+    clearAuth();
+    navigate("/login");
+  };
 
   return (
     <div style={{ padding: "40px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h1 style={{ color: "#1a3c5e" }}>My Training</h1>
-        <button onClick={logout}
-          style={{ padding: "8px 20px", background: "#e74c3c", color: "white",
-                   border: "none", borderRadius: "6px", cursor: "pointer" }}>
+        <button
+          onClick={logout}
+          style={{
+            padding: "8px 20px",
+            background: "#e74c3c",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
           Logout
         </button>
       </div>
@@ -1838,30 +2143,54 @@ export function EmployeeDashboard() {
 ```
 
 Create `frontend/src/features/employee/CoursesPage.jsx`:
+
 ```jsx
 export function CoursesPage() {
-  return <div style={{ padding: "40px" }}><h1>My Courses</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>My Courses</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/employee/VideoPlayerPage.jsx`:
+
 ```jsx
 export function VideoPlayerPage() {
-  return <div style={{ padding: "40px" }}><h1>Video Player</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Video Player</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/employee/AssessmentPage.jsx`:
+
 ```jsx
 export function AssessmentPage() {
-  return <div style={{ padding: "40px" }}><h1>Assessment</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Assessment</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
 Create `frontend/src/features/employee/CertificatesPage.jsx`:
+
 ```jsx
 export function CertificatesPage() {
-  return <div style={{ padding: "40px" }}><h1>My Certificates</h1><p>Coming soon</p></div>;
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>My Certificates</h1>
+      <p>Coming soon</p>
+    </div>
+  );
 }
 ```
 
@@ -1875,7 +2204,7 @@ import App from "./App";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 ```
 
@@ -1892,6 +2221,7 @@ docker compose up --build
 Open http://localhost in browser. You should see the Login screen.
 
 Test this full flow:
+
 1. Go to `/signup` → fill in form → submit
 2. Check MailHog at http://localhost:8025 → you should see the OTP email
 3. Go to `/verify-otp` → enter the OTP
@@ -1921,9 +2251,11 @@ git push origin develop
 
 ---
 
+## DONE
+
 # PHASE 5C — SECURITY HARDENING
 
-*(Unchanged — backend/Nginx, not affected by the JS/TS conversion)*
+_(Unchanged — backend/Nginx, not affected by the JS/TS conversion)_
 
 ---
 
@@ -2044,7 +2376,7 @@ git push origin develop
 
 # PHASE 5D — PRODUCTION DEPLOYMENT
 
-*(Unchanged — infra config, not affected by the JS/TS conversion)*
+_(Unchanged — infra config, not affected by the JS/TS conversion)_
 
 ---
 
@@ -2111,7 +2443,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro  # TLS certificates
+      - /etc/letsencrypt:/etc/letsencrypt:ro # TLS certificates
 
 volumes:
   mysql_data:
@@ -2252,16 +2584,16 @@ git push origin main --tags
 
 ## Complete Project Summary
 
-| Phase | What Was Built |
-|---|---|
-| Phase 0 | Git repo, Docker Compose, FastAPI skeleton, React skeleton, CI pipeline |
-| Phase 1 | Auth (signup/OTP/login/logout/forgot-password), RBAC, Company CRUD, User CRUD |
-| Phase 2 | Video upload, secure streaming, progress tracking, no-fast-forward, assessments |
-| Phase 3 | HR bulk upload, training assignment, compliance dashboard, Excel reports |
-| Phase 4 | Certificate PDF+QR generation, public verification, analytics |
-| Phase 5A | Real email delivery, Celery background tasks, dev tokens removed |
-| Phase 5B | React frontend (JavaScript) — auth screens, routing, role guards |
-| Phase 5C | Rate limiting, security headers, HTTPS |
-| Phase 5D | Production Docker Compose, cloud VM deployment, TLS |
+| Phase    | What Was Built                                                                  |
+| -------- | ------------------------------------------------------------------------------- |
+| Phase 0  | Git repo, Docker Compose, FastAPI skeleton, React skeleton, CI pipeline         |
+| Phase 1  | Auth (signup/OTP/login/logout/forgot-password), RBAC, Company CRUD, User CRUD   |
+| Phase 2  | Video upload, secure streaming, progress tracking, no-fast-forward, assessments |
+| Phase 3  | HR bulk upload, training assignment, compliance dashboard, Excel reports        |
+| Phase 4  | Certificate PDF+QR generation, public verification, analytics                   |
+| Phase 5A | Real email delivery, Celery background tasks, dev tokens removed                |
+| Phase 5B | React frontend (JavaScript) — auth screens, routing, role guards                |
+| Phase 5C | Rate limiting, security headers, HTTPS                                          |
+| Phase 5D | Production Docker Compose, cloud VM deployment, TLS                             |
 
 **The remaining frontend screens** (Admin Portal tables, HR Portal, Employee Portal, Video Player) follow the exact same pattern as the auth screens — fetch data with TanStack Query, display in a table/form, call the APIs you already built, all in plain JavaScript `.jsx` files. Let me know when you're ready and I'll write those screen by screen.
