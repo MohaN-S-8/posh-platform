@@ -1,33 +1,37 @@
-# Phase 5 — Complete Guide: Gaps + Frontend + Security + Deployment
+# Phase 5 — Complete Guide: Gaps + Frontend + Security + Deployment (JavaScript version)
+
+> This is the same Phase 5 guide, with the React frontend converted from TypeScript (.ts/.tsx) to plain JavaScript (.js/.jsx). Backend (Python) sections are unchanged.
 
 ## Where You Are
 
-| Phase                                | Status           |
-| ------------------------------------ | ---------------- |
-| Phase 0 — Foundations                | ✅ Complete      |
-| Phase 1 — Auth + User Management     | ✅ Complete      |
-| Phase 2 — Video + Assessments        | ✅ Complete      |
-| Phase 3 — HR Portal                  | ✅ Complete      |
-| Phase 4 — Certificates + Analytics   | ✅ Complete      |
-| **Phase 5A — Close Backend Gaps**    | ⬜ This document |
-| **Phase 5B — React Frontend**        | ⬜ This document |
-| **Phase 5C — Security Hardening**    | ⬜ This document |
+| Phase | Status |
+|---|---|
+| Phase 0 — Foundations | ✅ Complete |
+| Phase 1 — Auth + User Management | ✅ Complete |
+| Phase 2 — Video + Assessments | ✅ Complete |
+| Phase 3 — HR Portal | ✅ Complete |
+| Phase 4 — Certificates + Analytics | ✅ Complete |
+| **Phase 5A — Close Backend Gaps** | ⬜ This document |
+| **Phase 5B — React Frontend (JavaScript)** | ⬜ This document |
+| **Phase 5C — Security Hardening** | ⬜ This document |
 | **Phase 5D — Production Deployment** | ⬜ This document |
 
 ## All Known Gaps to Fix
 
-| File                              | Gap                                      | Fix in Step |
-| --------------------------------- | ---------------------------------------- | ----------- |
-| `auth_service.py` signup          | `dev_otp` returned in response           | Step 46     |
-| `auth_service.py` forgot_password | `dev_reset_token` in response            | Step 46     |
-| `user_service.py` create          | Hardcoded `Temp@1234` password           | Step 46     |
-| `assessment_service.py`           | Certificate generated inline, not Celery | Step 47     |
-| `auth_service.py` signup          | OTP email never actually sent            | Step 46     |
-| `user_service.py` create          | Welcome email never sent                 | Step 46     |
+| File | Gap | Fix in Step |
+|---|---|---|
+| `auth_service.py` signup | `dev_otp` returned in response | Step 46 |
+| `auth_service.py` forgot_password | `dev_reset_token` in response | Step 46 |
+| `user_service.py` create | Hardcoded `Temp@1234` password | Step 46 |
+| `assessment_service.py` | Certificate generated inline, not Celery | Step 47 |
+| `auth_service.py` signup | OTP email never actually sent | Step 46 |
+| `user_service.py` create | Welcome email never sent | Step 46 |
 
 ---
 
 # PHASE 5A — CLOSE BACKEND GAPS
+
+*(Unchanged — backend is Python, not affected by the JS/TS conversion)*
 
 ---
 
@@ -480,9 +484,9 @@ git push origin develop
 
 ---
 
-# PHASE 5B — REACT FRONTEND
+# PHASE 5B — REACT FRONTEND (JavaScript)
 
-The frontend calls all the APIs you built. We'll build each portal screen by screen.
+The frontend calls all the APIs you built. We'll build each portal screen by screen, using plain JavaScript (JSX) instead of TypeScript. No `.ts`/`.tsx` files, no type annotations, no interfaces — `zod` is still used for runtime validation since it works fine in plain JS.
 
 ---
 
@@ -493,56 +497,58 @@ Your `frontend/src/` should be organized like this. Create missing folders:
 ```
 frontend/src/
 ├── api/                    ← all API call functions
-│   ├── auth.ts
-│   ├── company.ts
-│   ├── users.ts
-│   ├── videos.ts
-│   ├── hr.ts
-│   └── certificates.ts
+│   ├── auth.js
+│   ├── company.js
+│   ├── users.js
+│   ├── videos.js
+│   ├── hr.js
+│   └── certificates.js
 ├── components/
 │   ├── ui/                 ← shared: Button, Input, Modal, Table
 │   └── layout/             ← Navbar, Sidebar, PageWrapper
 ├── features/
 │   ├── auth/               ← Login, Signup, OTP, ForgotPassword screens
-│   ├── admin/              ← Admin portal screens
+│   ├── admin/               ← Admin portal screens
 │   ├── hr/                 ← HR portal screens
 │   └── employee/           ← Employee portal screens
 ├── hooks/
-│   ├── useAuth.ts          ← auth state management
-│   └── useCurrentUser.ts
+│   ├── useAuth.js          ← auth state management
+│   └── useCurrentUser.js
 ├── routes/
-│   ├── ProtectedRoute.tsx
-│   └── RoleRoute.tsx
+│   ├── ProtectedRoute.jsx
+│   └── RoleRoute.jsx
 ├── store/
-│   └── authStore.ts        ← Zustand store for auth
+│   └── authStore.js        ← Zustand store for auth
 ├── i18n/
 │   ├── en.json
 │   ├── hi.json
 │   └── ta.json
-├── App.tsx
-└── main.tsx
+├── App.jsx
+└── main.jsx
 ```
 
 Run this to create the folders:
 
 ```bash
 cd frontend/src
-mkdir api, components/ui, components/layout, features/auth, features/admin, features/hr, features/employee, hooks, routes, store, i18n
+mkdir -p api components/ui components/layout features/auth features/admin features/hr features/employee hooks routes store i18n
 ```
+
+> If you're migrating an existing TypeScript project, also update `frontend/vite.config` (`.ts` → `.js`) and remove `typescript`, `@types/*`, and `tsconfig.json` from the project, since they're no longer needed. Make sure `frontend/index.html` points at `/src/main.jsx` instead of `/src/main.tsx`.
 
 ---
 
 ## STEP 51: Set Up Axios API Client
 
-Create `frontend/src/api/client.ts`:
+Create `frontend/src/api/client.js`:
 
-```typescript
+```javascript
 import axios from "axios";
 
 // All API calls go through this instance
 const apiClient = axios.create({
-  baseURL: "/api/v1", // proxied to backend by Nginx
-  withCredentials: true, // sends cookies (JWT tokens) automatically
+  baseURL: "/api/v1",        // proxied to backend by Nginx
+  withCredentials: true,     // sends cookies (JWT tokens) automatically
   headers: {
     "Content-Type": "application/json",
   },
@@ -575,7 +581,7 @@ apiClient.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  },
+  }
 );
 
 export default apiClient;
@@ -585,48 +591,33 @@ export default apiClient;
 
 ## STEP 52: Create Auth API Functions
 
-Create `frontend/src/api/auth.ts`:
+Create `frontend/src/api/auth.js`:
 
-```typescript
+```javascript
 import apiClient from "./client";
 
-export interface SignupData {
-  first_name: string;
-  last_name: string;
-  email: string;
-  password: string;
-  confirm_password: string;
-  mobile: string;
-}
-
-export interface LoginData {
-  email: string;
-  password: string;
-}
+// Shape reference (JS has no interfaces, so keep this as a comment):
+// SignupData: { first_name, last_name, email, password, confirm_password, mobile }
+// LoginData:  { email, password }
 
 export const authApi = {
-  signup: (data: SignupData) => apiClient.post("/auth/signup", data),
+  signup: (data) =>
+    apiClient.post("/auth/signup", data),
 
-  verifyOtp: (email: string, otp: string) =>
+  verifyOtp: (email, otp) =>
     apiClient.post("/auth/verify-otp", { email, otp }),
 
-  login: (data: LoginData) => apiClient.post("/auth/login", data),
+  login: (data) =>
+    apiClient.post("/auth/login", data),
 
-  logout: () => apiClient.post("/auth/logout"),
+  logout: () =>
+    apiClient.post("/auth/logout"),
 
-  forgotPassword: (email: string) =>
+  forgotPassword: (email) =>
     apiClient.post("/auth/forgot-password", { email }),
 
-  resetPassword: (
-    token: string,
-    new_password: string,
-    confirm_password: string,
-  ) =>
-    apiClient.post("/auth/reset-password", {
-      token,
-      new_password,
-      confirm_password,
-    }),
+  resetPassword: (token, new_password, confirm_password) =>
+    apiClient.post("/auth/reset-password", { token, new_password, confirm_password }),
 };
 ```
 
@@ -634,26 +625,14 @@ export const authApi = {
 
 ## STEP 53: Create Auth Store (Zustand)
 
-Create `frontend/src/store/authStore.ts`:
+Create `frontend/src/store/authStore.js`:
 
-```typescript
+```javascript
 import { create } from "zustand";
 
-interface User {
-  user_id: number;
-  role_id: number;
-  company_id: number;
-}
+// User shape reference: { user_id, role_id, company_id }
 
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  setAuth: (user: User, token: string) => void;
-  clearAuth: () => void;
-}
-
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create((set) => ({
   user: null,
   token: localStorage.getItem("access_token"),
   isAuthenticated: !!localStorage.getItem("access_token"),
@@ -674,37 +653,29 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 ## STEP 54: Create Route Guards
 
-Create `frontend/src/routes/ProtectedRoute.tsx`:
+Create `frontend/src/routes/ProtectedRoute.jsx`:
 
-```tsx
+```jsx
 import { Navigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
-interface Props {
-  children: React.ReactNode;
-}
-
 // Blocks unauthenticated users — redirects to /login
-export function ProtectedRoute({ children }: Props) {
+export function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 ```
 
-Create `frontend/src/routes/RoleRoute.tsx`:
+Create `frontend/src/routes/RoleRoute.jsx`:
 
-```tsx
+```jsx
 import { Navigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
-interface Props {
-  children: React.ReactNode;
-  allowedRoles: number[]; // e.g. [1] for Super Admin, [1,2,3] for Admin+HR
-}
-
+// allowedRoles: array of numbers, e.g. [1] for Super Admin, [1,2,3] for Admin+HR
 // Role IDs: 1=Super Admin, 2=Company Admin, 3=HR, 4=Employee
-export function RoleRoute({ children, allowedRoles }: Props) {
+export function RoleRoute({ children, allowedRoles }) {
   const { user } = useAuthStore();
   if (!user || !allowedRoles.includes(user.role_id)) {
     return <Navigate to="/unauthorized" replace />;
@@ -717,9 +688,9 @@ export function RoleRoute({ children, allowedRoles }: Props) {
 
 ## STEP 55: Create App Router
 
-Update `frontend/src/App.tsx`:
+Create `frontend/src/App.jsx`:
 
-```tsx
+```jsx
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { RoleRoute } from "./routes/RoleRoute";
@@ -905,9 +876,9 @@ export default App;
 
 ### 56.1 Login Page
 
-Create `frontend/src/features/auth/LoginPage.tsx`:
+Create `frontend/src/features/auth/LoginPage.jsx`:
 
-```tsx
+```jsx
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -930,8 +901,6 @@ const loginSchema = z.object({
     .max(15, "Maximum 15 characters"),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
-
 export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -943,12 +912,12 @@ export function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isValid },
-  } = useForm<LoginForm>({
+  } = useForm({
     resolver: zodResolver(loginSchema),
     mode: "onChange",
   });
 
-  const onSubmit = async (data: LoginForm) => {
+  const onSubmit = async (data) => {
     setLoading(true);
     setError("");
     try {
@@ -960,7 +929,7 @@ export function LoginPage() {
       if (role_id === 1 || role_id === 2) navigate("/admin");
       else if (role_id === 3) navigate("/hr");
       else navigate("/employee");
-    } catch (err: any) {
+    } catch (err) {
       const detail = err.response?.data?.detail;
       if (err.response?.status === 423) {
         setError(detail || "Account locked. Try again later.");
@@ -1084,9 +1053,7 @@ export function LoginPage() {
               </button>
             </div>
             {errors.password && (
-              <p
-                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
-              >
+              <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
                 {errors.password.message}
               </p>
             )}
@@ -1155,9 +1122,9 @@ export function LoginPage() {
 
 ### 56.2 Signup Page
 
-Create `frontend/src/features/auth/SignupPage.tsx`:
+Create `frontend/src/features/auth/SignupPage.jsx`:
 
-```tsx
+```jsx
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1172,7 +1139,9 @@ const signupSchema = z
       .min(2, "Minimum 2 characters")
       .max(50, "Maximum 50 characters")
       .regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
-    last_name: z.string().regex(/^[a-zA-Z\s]*$/, "Only letters allowed"),
+    last_name: z
+      .string()
+      .regex(/^[a-zA-Z\s]*$/, "Only letters allowed"),
     email: z
       .string()
       .min(1, "Email is required")
@@ -1194,8 +1163,6 @@ const signupSchema = z
     path: ["confirm_password"],
   });
 
-type SignupForm = z.infer<typeof signupSchema>;
-
 export function SignupPage() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -1204,36 +1171,33 @@ export function SignupPage() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors, isValid },
-  } = useForm<SignupForm>({
+  } = useForm({
     resolver: zodResolver(signupSchema),
     mode: "onChange",
   });
 
-  const onSubmit = async (data: SignupForm) => {
+  const onSubmit = async (data) => {
     setLoading(true);
     setError("");
     try {
       await authApi.signup(data);
       // Navigate to OTP page with email in state
       navigate("/verify-otp", { state: { email: data.email } });
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Signup failed. Please try again.",
-      );
+    } catch (err) {
+      setError(err.response?.data?.detail || "Signup failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const inputStyle = (hasError: boolean) => ({
+  const inputStyle = (hasError) => ({
     width: "100%",
     padding: "10px 14px",
     border: `1px solid ${hasError ? "#e74c3c" : "#ddd"}`,
     borderRadius: "6px",
     fontSize: "14px",
-    boxSizing: "border-box" as const,
+    boxSizing: "border-box",
   });
 
   const errorStyle = {
@@ -1263,9 +1227,7 @@ export function SignupPage() {
           maxWidth: "480px",
         }}
       >
-        <h1
-          style={{ color: "#1a3c5e", marginBottom: "8px", textAlign: "center" }}
-        >
+        <h1 style={{ color: "#1a3c5e", marginBottom: "8px", textAlign: "center" }}>
           Create Account
         </h1>
         <p style={{ color: "#666", textAlign: "center", marginBottom: "32px" }}>
@@ -1273,127 +1235,68 @@ export function SignupPage() {
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: 500,
-                }}
-              >
+              <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
                 First Name *
               </label>
-              <input
-                {...register("first_name")}
-                style={inputStyle(!!errors.first_name)}
-              />
-              {errors.first_name && (
-                <p style={errorStyle}>{errors.first_name.message}</p>
-              )}
+              <input {...register("first_name")} style={inputStyle(!!errors.first_name)} />
+              {errors.first_name && <p style={errorStyle}>{errors.first_name.message}</p>}
             </div>
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: 500,
-                }}
-              >
+              <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
                 Last Name
               </label>
-              <input
-                {...register("last_name")}
-                style={inputStyle(!!errors.last_name)}
-              />
-              {errors.last_name && (
-                <p style={errorStyle}>{errors.last_name.message}</p>
-              )}
+              <input {...register("last_name")} style={inputStyle(!!errors.last_name)} />
+              {errors.last_name && <p style={errorStyle}>{errors.last_name.message}</p>}
             </div>
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
               Email Address *
             </label>
-            <input
-              type="email"
-              {...register("email")}
-              style={inputStyle(!!errors.email)}
-            />
+            <input type="email" {...register("email")} style={inputStyle(!!errors.email)} />
             {errors.email && <p style={errorStyle}>{errors.email.message}</p>}
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
               Mobile Number *
             </label>
-            <input
-              type="tel"
-              {...register("mobile")}
-              placeholder="10 digit number"
-              style={inputStyle(!!errors.mobile)}
-            />
+            <input type="tel" {...register("mobile")} placeholder="10 digit number"
+              style={inputStyle(!!errors.mobile)} />
             {errors.mobile && <p style={errorStyle}>{errors.mobile.message}</p>}
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
               Password *
             </label>
-            <input
-              type="password"
-              {...register("password")}
-              style={inputStyle(!!errors.password)}
-            />
-            {errors.password && (
-              <p style={errorStyle}>{errors.password.message}</p>
-            )}
+            <input type="password" {...register("password")} style={inputStyle(!!errors.password)} />
+            {errors.password && <p style={errorStyle}>{errors.password.message}</p>}
             <p style={{ fontSize: "11px", color: "#999", marginTop: "4px" }}>
               8–15 characters, uppercase, lowercase, number, special character
             </p>
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
               Confirm Password *
             </label>
-            <input
-              type="password"
-              {...register("confirm_password")}
-              style={inputStyle(!!errors.confirm_password)}
-            />
+            <input type="password" {...register("confirm_password")}
+              style={inputStyle(!!errors.confirm_password)} />
             {errors.confirm_password && (
               <p style={errorStyle}>{errors.confirm_password.message}</p>
             )}
           </div>
 
           {error && (
-            <div
-              style={{
-                background: "#fdf0f0",
-                border: "1px solid #e74c3c",
-                borderRadius: "6px",
-                padding: "10px 14px",
-                color: "#e74c3c",
-                fontSize: "14px",
-                marginTop: "16px",
-              }}
-            >
+            <div style={{
+              background: "#fdf0f0", border: "1px solid #e74c3c",
+              borderRadius: "6px", padding: "10px 14px",
+              color: "#e74c3c", fontSize: "14px", marginTop: "16px",
+            }}>
               {error}
             </div>
           )}
@@ -1402,15 +1305,10 @@ export function SignupPage() {
             type="submit"
             disabled={!isValid || loading}
             style={{
-              width: "100%",
-              padding: "12px",
-              marginTop: "24px",
+              width: "100%", padding: "12px", marginTop: "24px",
               background: !isValid || loading ? "#93b8d4" : "#1a3c5e",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              fontSize: "16px",
-              fontWeight: 600,
+              color: "white", border: "none", borderRadius: "6px",
+              fontSize: "16px", fontWeight: 600,
               cursor: !isValid || loading ? "not-allowed" : "pointer",
             }}
           >
@@ -1434,9 +1332,9 @@ export function SignupPage() {
 
 ### 56.3 OTP Verification Page
 
-Create `frontend/src/features/auth/OTPPage.tsx`:
+Create `frontend/src/features/auth/OTPPage.jsx`:
 
-```tsx
+```jsx
 import { useState, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { authApi } from "../../api/auth";
@@ -1444,28 +1342,28 @@ import { authApi } from "../../api/auth";
 export function OTPPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const email = (location.state as any)?.email || "";
+  const email = location.state?.email || "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const inputs = useRef([]);
 
-  const handleChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return; // digits only
+  const handleChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;   // digits only
     const newOtp = [...otp];
-    newOtp[index] = value.slice(-1); // one digit per box
+    newOtp[index] = value.slice(-1);    // one digit per box
     setOtp(newOtp);
     if (value && index < 5) inputs.current[index + 1]?.focus();
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+  const handleKeyDown = (index, e) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputs.current[index - 1]?.focus();
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const code = otp.join("");
     if (code.length !== 6) {
@@ -1479,7 +1377,7 @@ export function OTPPage() {
       navigate("/login", {
         state: { message: "Email verified! You can now log in." },
       });
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.detail || "Invalid or expired OTP.");
     } finally {
       setLoading(false);
@@ -1487,29 +1385,16 @@ export function OTPPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f5f7fa",
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "40px",
-          borderRadius: "12px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          width: "100%",
-          maxWidth: "400px",
-          textAlign: "center",
-        }}
-      >
-        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>
-          Verify Your Email
-        </h1>
+    <div style={{
+      minHeight: "100vh", display: "flex",
+      alignItems: "center", justifyContent: "center", background: "#f5f7fa",
+    }}>
+      <div style={{
+        background: "white", padding: "40px", borderRadius: "12px",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: "100%", maxWidth: "400px",
+        textAlign: "center",
+      }}>
+        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>Verify Your Email</h1>
         <p style={{ color: "#666", marginBottom: "8px" }}>
           Enter the 6-digit code sent to
         </p>
@@ -1518,14 +1403,7 @@ export function OTPPage() {
         </p>
 
         <form onSubmit={handleSubmit}>
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              justifyContent: "center",
-              marginBottom: "24px",
-            }}
-          >
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginBottom: "24px" }}>
             {otp.map((digit, i) => (
               <input
                 key={i}
@@ -1538,13 +1416,9 @@ export function OTPPage() {
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 aria-label={`OTP digit ${i + 1}`}
                 style={{
-                  width: "48px",
-                  height: "56px",
-                  textAlign: "center",
-                  fontSize: "24px",
-                  fontWeight: 700,
-                  border: "2px solid #ddd",
-                  borderRadius: "8px",
+                  width: "48px", height: "56px", textAlign: "center",
+                  fontSize: "24px", fontWeight: 700,
+                  border: "2px solid #ddd", borderRadius: "8px",
                   outline: "none",
                 }}
               />
@@ -1559,19 +1433,11 @@ export function OTPPage() {
             type="submit"
             disabled={otp.join("").length !== 6 || loading}
             style={{
-              width: "100%",
-              padding: "12px",
-              background:
-                otp.join("").length !== 6 || loading ? "#93b8d4" : "#1a3c5e",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              fontSize: "16px",
-              fontWeight: 600,
-              cursor:
-                otp.join("").length !== 6 || loading
-                  ? "not-allowed"
-                  : "pointer",
+              width: "100%", padding: "12px",
+              background: otp.join("").length !== 6 || loading ? "#93b8d4" : "#1a3c5e",
+              color: "white", border: "none", borderRadius: "6px",
+              fontSize: "16px", fontWeight: 600,
+              cursor: otp.join("").length !== 6 || loading ? "not-allowed" : "pointer",
             }}
           >
             {loading ? "Verifying..." : "Verify Email"}
@@ -1580,9 +1446,7 @@ export function OTPPage() {
 
         <p style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
           Didn't receive the code?{" "}
-          <Link to="/signup" style={{ color: "#1a3c5e" }}>
-            Go back to signup
-          </Link>
+          <Link to="/signup" style={{ color: "#1a3c5e" }}>Go back to signup</Link>
         </p>
       </div>
     </div>
@@ -1592,9 +1456,9 @@ export function OTPPage() {
 
 ### 56.4 Forgot Password Page
 
-Create `frontend/src/features/auth/ForgotPasswordPage.tsx`:
+Create `frontend/src/features/auth/ForgotPasswordPage.jsx`:
 
-```tsx
+```jsx
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1610,13 +1474,10 @@ export function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isValid },
-  } = useForm({ resolver: zodResolver(schema), mode: "onChange" });
+  const { register, handleSubmit, formState: { errors, isValid } } =
+    useForm({ resolver: zodResolver(schema), mode: "onChange" });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data) => {
     setLoading(true);
     try {
       await authApi.forgotPassword(data.email);
@@ -1627,98 +1488,59 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f5f7fa",
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "40px",
-          borderRadius: "12px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          width: "100%",
-          maxWidth: "420px",
-        }}
-      >
+    <div style={{
+      minHeight: "100vh", display: "flex",
+      alignItems: "center", justifyContent: "center", background: "#f5f7fa",
+    }}>
+      <div style={{
+        background: "white", padding: "40px", borderRadius: "12px",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: "100%", maxWidth: "420px",
+      }}>
         {submitted ? (
           <div style={{ textAlign: "center" }}>
             <h2 style={{ color: "#27ae60" }}>✓ Email Sent</h2>
             <p style={{ color: "#666", marginTop: "12px" }}>
-              If your email is registered, you will receive password reset
-              instructions.
+              If your email is registered, you will receive password reset instructions.
             </p>
-            <Link
-              to="/login"
-              style={{
-                display: "inline-block",
-                marginTop: "24px",
-                color: "#1a3c5e",
-                fontWeight: 600,
-              }}
-            >
+            <Link to="/login" style={{
+              display: "inline-block", marginTop: "24px",
+              color: "#1a3c5e", fontWeight: 600,
+            }}>
               Back to Login
             </Link>
           </div>
         ) : (
           <>
-            <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>
-              Forgot Password
-            </h1>
+            <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>Forgot Password</h1>
             <p style={{ color: "#666", marginBottom: "32px" }}>
               Enter your email and we'll send you reset instructions.
             </p>
             <form onSubmit={handleSubmit(onSubmit)}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: 500,
-                }}
-              >
+              <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
                 Email Address *
               </label>
               <input
                 type="email"
                 {...register("email")}
                 style={{
-                  width: "100%",
-                  padding: "10px 14px",
+                  width: "100%", padding: "10px 14px",
                   border: `1px solid ${errors.email ? "#e74c3c" : "#ddd"}`,
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  boxSizing: "border-box",
+                  borderRadius: "6px", fontSize: "14px", boxSizing: "border-box",
                 }}
               />
               {errors.email && (
-                <p
-                  style={{
-                    color: "#e74c3c",
-                    fontSize: "12px",
-                    marginTop: "4px",
-                  }}
-                >
-                  {(errors.email as any).message}
+                <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+                  {errors.email.message}
                 </p>
               )}
               <button
                 type="submit"
                 disabled={!isValid || loading}
                 style={{
-                  width: "100%",
-                  padding: "12px",
-                  marginTop: "24px",
+                  width: "100%", padding: "12px", marginTop: "24px",
                   background: !isValid || loading ? "#93b8d4" : "#1a3c5e",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "6px",
-                  fontSize: "16px",
-                  fontWeight: 600,
+                  color: "white", border: "none", borderRadius: "6px",
+                  fontSize: "16px", fontWeight: 600,
                   cursor: !isValid || loading ? "not-allowed" : "pointer",
                 }}
               >
@@ -1740,9 +1562,9 @@ export function ForgotPasswordPage() {
 
 ### 56.5 Reset Password Page
 
-Create `frontend/src/features/auth/ResetPasswordPage.tsx`:
+Create `frontend/src/features/auth/ResetPasswordPage.jsx`:
 
-```tsx
+```jsx
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1754,8 +1576,7 @@ const schema = z
   .object({
     new_password: z
       .string()
-      .min(8)
-      .max(15)
+      .min(8).max(15)
       .regex(/[A-Z]/, "Needs uppercase")
       .regex(/[a-z]/, "Needs lowercase")
       .regex(/[0-9]/, "Needs number")
@@ -1774,144 +1595,84 @@ export function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isValid },
-  } = useForm({ resolver: zodResolver(schema), mode: "onChange" });
+  const { register, handleSubmit, formState: { errors, isValid } } =
+    useForm({ resolver: zodResolver(schema), mode: "onChange" });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data) => {
     setLoading(true);
     setError("");
     try {
-      await authApi.resetPassword(
-        token,
-        data.new_password,
-        data.confirm_password,
-      );
-      navigate("/login", {
-        state: { message: "Password reset successfully. Please log in." },
-      });
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Reset failed. Token may have expired.",
-      );
+      await authApi.resetPassword(token, data.new_password, data.confirm_password);
+      navigate("/login", { state: { message: "Password reset successfully. Please log in." } });
+    } catch (err) {
+      setError(err.response?.data?.detail || "Reset failed. Token may have expired.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f5f7fa",
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "40px",
-          borderRadius: "12px",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          width: "100%",
-          maxWidth: "420px",
-        }}
-      >
-        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>
-          Reset Password
-        </h1>
-        <p style={{ color: "#666", marginBottom: "32px" }}>
-          Enter your new password below.
-        </p>
+    <div style={{
+      minHeight: "100vh", display: "flex",
+      alignItems: "center", justifyContent: "center", background: "#f5f7fa",
+    }}>
+      <div style={{
+        background: "white", padding: "40px", borderRadius: "12px",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: "100%", maxWidth: "420px",
+      }}>
+        <h1 style={{ color: "#1a3c5e", marginBottom: "8px" }}>Reset Password</h1>
+        <p style={{ color: "#666", marginBottom: "32px" }}>Enter your new password below.</p>
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
               New Password *
             </label>
-            <input
-              type="password"
-              {...register("new_password")}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                border: `1px solid ${errors.new_password ? "#e74c3c" : "#ddd"}`,
-                borderRadius: "6px",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+            <input type="password" {...register("new_password")} style={{
+              width: "100%", padding: "10px 14px",
+              border: `1px solid ${errors.new_password ? "#e74c3c" : "#ddd"}`,
+              borderRadius: "6px", fontSize: "14px", boxSizing: "border-box",
+            }} />
             {errors.new_password && (
-              <p
-                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
-              >
-                {(errors.new_password as any).message}
+              <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+                {errors.new_password.message}
               </p>
             )}
           </div>
 
           <div>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}>
               Confirm Password *
             </label>
-            <input
-              type="password"
-              {...register("confirm_password")}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                border: `1px solid ${errors.confirm_password ? "#e74c3c" : "#ddd"}`,
-                borderRadius: "6px",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
+            <input type="password" {...register("confirm_password")} style={{
+              width: "100%", padding: "10px 14px",
+              border: `1px solid ${errors.confirm_password ? "#e74c3c" : "#ddd"}`,
+              borderRadius: "6px", fontSize: "14px", boxSizing: "border-box",
+            }} />
             {errors.confirm_password && (
-              <p
-                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
-              >
-                {(errors.confirm_password as any).message}
+              <p style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}>
+                {errors.confirm_password.message}
               </p>
             )}
           </div>
 
           {error && (
-            <div
-              style={{
-                background: "#fdf0f0",
-                border: "1px solid #e74c3c",
-                borderRadius: "6px",
-                padding: "10px 14px",
-                color: "#e74c3c",
-                fontSize: "14px",
-                marginTop: "16px",
-              }}
-            >
+            <div style={{
+              background: "#fdf0f0", border: "1px solid #e74c3c",
+              borderRadius: "6px", padding: "10px 14px",
+              color: "#e74c3c", fontSize: "14px", marginTop: "16px",
+            }}>
               {error}
             </div>
           )}
 
           <button
-            type="submit"
-            disabled={!isValid || loading}
+            type="submit" disabled={!isValid || loading}
             style={{
-              width: "100%",
-              padding: "12px",
-              marginTop: "24px",
+              width: "100%", padding: "12px", marginTop: "24px",
               background: !isValid || loading ? "#93b8d4" : "#1a3c5e",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              fontSize: "16px",
-              fontWeight: 600,
+              color: "white", border: "none", borderRadius: "6px",
+              fontSize: "16px", fontWeight: 600,
               cursor: !isValid || loading ? "not-allowed" : "pointer",
             }}
           >
@@ -1934,9 +1695,9 @@ Create these files now as placeholders. You'll fill them in after the auth scree
 # Run from frontend/src/features/
 ```
 
-Create `frontend/src/features/admin/AdminDashboard.tsx`:
+Create `frontend/src/features/admin/AdminDashboard.jsx`:
 
-```tsx
+```jsx
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 
@@ -1944,60 +1705,31 @@ export function AdminDashboard() {
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
 
-  const logout = () => {
-    clearAuth();
-    navigate("/login");
-  };
+  const logout = () => { clearAuth(); navigate("/login"); };
 
   return (
     <div style={{ padding: "40px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ color: "#1a3c5e" }}>Admin Portal</h1>
-        <button
-          onClick={logout}
-          style={{
-            padding: "8px 20px",
-            background: "#e74c3c",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={logout}
+          style={{ padding: "8px 20px", background: "#e74c3c", color: "white",
+                   border: "none", borderRadius: "6px", cursor: "pointer" }}>
           Logout
         </button>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "20px",
-          marginTop: "32px",
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginTop: "32px" }}>
         {[
           { label: "Companies", path: "/admin/companies" },
           { label: "Users", path: "/admin/users" },
           { label: "Videos", path: "/admin/videos" },
         ].map((item) => (
-          <div
-            key={item.path}
+          <div key={item.path}
             onClick={() => navigate(item.path)}
             style={{
-              background: "white",
-              padding: "24px",
-              borderRadius: "8px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-              cursor: "pointer",
+              background: "white", padding: "24px", borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)", cursor: "pointer",
               borderLeft: "4px solid #1a3c5e",
-            }}
-          >
+            }}>
             <h3 style={{ color: "#1a3c5e" }}>{item.label}</h3>
           </div>
         ))}
@@ -2013,80 +1745,44 @@ Create similar placeholder files for all other portal pages:
 # Create all placeholder files at once
 ```
 
-Create `frontend/src/features/admin/CompanyListPage.tsx`:
-
-```tsx
+Create `frontend/src/features/admin/CompanyListPage.jsx`:
+```jsx
 export function CompanyListPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Company Management</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Company Management</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/admin/UserListPage.tsx`:
-
-```tsx
+Create `frontend/src/features/admin/UserListPage.jsx`:
+```jsx
 export function UserListPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>User Management</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>User Management</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/admin/VideoListPage.tsx`:
-
-```tsx
+Create `frontend/src/features/admin/VideoListPage.jsx`:
+```jsx
 export function VideoListPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Video Management</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Video Management</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/hr/HRDashboard.tsx`:
-
-```tsx
+Create `frontend/src/features/hr/HRDashboard.jsx`:
+```jsx
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 
 export function HRDashboard() {
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
-  const logout = () => {
-    clearAuth();
-    navigate("/login");
-  };
+  const logout = () => { clearAuth(); navigate("/login"); };
 
   return (
     <div style={{ padding: "40px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ color: "#1a3c5e" }}>HR Portal</h1>
-        <button
-          onClick={logout}
-          style={{
-            padding: "8px 20px",
-            background: "#e74c3c",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={logout}
+          style={{ padding: "8px 20px", background: "#e74c3c", color: "white",
+                   border: "none", borderRadius: "6px", cursor: "pointer" }}>
           Logout
         </button>
       </div>
@@ -2095,80 +1791,44 @@ export function HRDashboard() {
 }
 ```
 
-Create `frontend/src/features/hr/BulkUploadPage.tsx`:
-
-```tsx
+Create `frontend/src/features/hr/BulkUploadPage.jsx`:
+```jsx
 export function BulkUploadPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Bulk Employee Upload</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Bulk Employee Upload</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/hr/TrainingAssignPage.tsx`:
-
-```tsx
+Create `frontend/src/features/hr/TrainingAssignPage.jsx`:
+```jsx
 export function TrainingAssignPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Assign Training</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Assign Training</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/hr/CompliancePage.tsx`:
-
-```tsx
+Create `frontend/src/features/hr/CompliancePage.jsx`:
+```jsx
 export function CompliancePage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Compliance Dashboard</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Compliance Dashboard</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/employee/EmployeeDashboard.tsx`:
-
-```tsx
+Create `frontend/src/features/employee/EmployeeDashboard.jsx`:
+```jsx
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 
 export function EmployeeDashboard() {
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
-  const logout = () => {
-    clearAuth();
-    navigate("/login");
-  };
+  const logout = () => { clearAuth(); navigate("/login"); };
 
   return (
     <div style={{ padding: "40px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ color: "#1a3c5e" }}>My Training</h1>
-        <button
-          onClick={logout}
-          style={{
-            padding: "8px 20px",
-            background: "#e74c3c",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={logout}
+          style={{ padding: "8px 20px", background: "#e74c3c", color: "white",
+                   border: "none", borderRadius: "6px", cursor: "pointer" }}>
           Logout
         </button>
       </div>
@@ -2177,56 +1837,46 @@ export function EmployeeDashboard() {
 }
 ```
 
-Create `frontend/src/features/employee/CoursesPage.tsx`:
-
-```tsx
+Create `frontend/src/features/employee/CoursesPage.jsx`:
+```jsx
 export function CoursesPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>My Courses</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>My Courses</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/employee/VideoPlayerPage.tsx`:
-
-```tsx
+Create `frontend/src/features/employee/VideoPlayerPage.jsx`:
+```jsx
 export function VideoPlayerPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Video Player</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Video Player</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/employee/AssessmentPage.tsx`:
-
-```tsx
+Create `frontend/src/features/employee/AssessmentPage.jsx`:
+```jsx
 export function AssessmentPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>Assessment</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>Assessment</h1><p>Coming soon</p></div>;
 }
 ```
 
-Create `frontend/src/features/employee/CertificatesPage.tsx`:
-
-```tsx
+Create `frontend/src/features/employee/CertificatesPage.jsx`:
+```jsx
 export function CertificatesPage() {
-  return (
-    <div style={{ padding: "40px" }}>
-      <h1>My Certificates</h1>
-      <p>Coming soon</p>
-    </div>
-  );
+  return <div style={{ padding: "40px" }}><h1>My Certificates</h1><p>Coming soon</p></div>;
 }
+```
+
+Also create `frontend/src/main.jsx` (rename from `main.tsx` if migrating):
+
+```jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
 ```
 
 ---
@@ -2242,7 +1892,6 @@ docker compose up --build
 Open http://localhost in browser. You should see the Login screen.
 
 Test this full flow:
-
 1. Go to `/signup` → fill in form → submit
 2. Check MailHog at http://localhost:8025 → you should see the OTP email
 3. Go to `/verify-otp` → enter the OTP
@@ -2266,13 +1915,15 @@ ruff check .
 cd ..
 
 git add .
-git commit -m "feat(phase5b): React frontend — auth screens (login, signup, OTP, forgot/reset password), routing, role guards"
+git commit -m "feat(phase5b): React frontend (JavaScript) — auth screens (login, signup, OTP, forgot/reset password), routing, role guards"
 git push origin develop
 ```
 
 ---
 
 # PHASE 5C — SECURITY HARDENING
+
+*(Unchanged — backend/Nginx, not affected by the JS/TS conversion)*
 
 ---
 
@@ -2393,6 +2044,8 @@ git push origin develop
 
 # PHASE 5D — PRODUCTION DEPLOYMENT
 
+*(Unchanged — infra config, not affected by the JS/TS conversion)*
+
 ---
 
 ## STEP 64: Create Production Docker Compose
@@ -2458,7 +2111,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro # TLS certificates
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # TLS certificates
 
 volumes:
   mysql_data:
@@ -2577,6 +2230,7 @@ docker compose -f docker-compose.prod.yml logs celery-worker --tail=50
 - [ ] Celery worker running and processing tasks
 - [ ] DB backup scheduled (mysqldump to MinIO daily)
 - [ ] CI pipeline deploys on Git tag push
+- [ ] `tsconfig.json`, `typescript`, and `@types/*` packages removed from `frontend/package.json` if this was migrated from TS
 
 ---
 
@@ -2584,7 +2238,7 @@ docker compose -f docker-compose.prod.yml logs celery-worker --tail=50
 
 ```bash
 git add .
-git commit -m "feat(phase5): complete — email delivery, Celery, React auth UI, security hardening, production deployment config"
+git commit -m "feat(phase5): complete — email delivery, Celery, React (JS) auth UI, security hardening, production deployment config"
 git push origin develop
 
 # Merge to main and tag the release
@@ -2598,16 +2252,16 @@ git push origin main --tags
 
 ## Complete Project Summary
 
-| Phase    | What Was Built                                                                  |
-| -------- | ------------------------------------------------------------------------------- |
-| Phase 0  | Git repo, Docker Compose, FastAPI skeleton, React skeleton, CI pipeline         |
-| Phase 1  | Auth (signup/OTP/login/logout/forgot-password), RBAC, Company CRUD, User CRUD   |
-| Phase 2  | Video upload, secure streaming, progress tracking, no-fast-forward, assessments |
-| Phase 3  | HR bulk upload, training assignment, compliance dashboard, Excel reports        |
-| Phase 4  | Certificate PDF+QR generation, public verification, analytics                   |
-| Phase 5A | Real email delivery, Celery background tasks, dev tokens removed                |
-| Phase 5B | React frontend — auth screens, routing, role guards                             |
-| Phase 5C | Rate limiting, security headers, HTTPS                                          |
-| Phase 5D | Production Docker Compose, cloud VM deployment, TLS                             |
+| Phase | What Was Built |
+|---|---|
+| Phase 0 | Git repo, Docker Compose, FastAPI skeleton, React skeleton, CI pipeline |
+| Phase 1 | Auth (signup/OTP/login/logout/forgot-password), RBAC, Company CRUD, User CRUD |
+| Phase 2 | Video upload, secure streaming, progress tracking, no-fast-forward, assessments |
+| Phase 3 | HR bulk upload, training assignment, compliance dashboard, Excel reports |
+| Phase 4 | Certificate PDF+QR generation, public verification, analytics |
+| Phase 5A | Real email delivery, Celery background tasks, dev tokens removed |
+| Phase 5B | React frontend (JavaScript) — auth screens, routing, role guards |
+| Phase 5C | Rate limiting, security headers, HTTPS |
+| Phase 5D | Production Docker Compose, cloud VM deployment, TLS |
 
-**The remaining frontend screens** (Admin Portal tables, HR Portal, Employee Portal, Video Player) follow the exact same pattern as the auth screens — fetch data with TanStack Query, display in a table/form, call the APIs you already built. Let me know when you're ready and I'll write those screen by screen.
+**The remaining frontend screens** (Admin Portal tables, HR Portal, Employee Portal, Video Player) follow the exact same pattern as the auth screens — fetch data with TanStack Query, display in a table/form, call the APIs you already built, all in plain JavaScript `.jsx` files. Let me know when you're ready and I'll write those screen by screen.
