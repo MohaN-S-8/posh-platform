@@ -6,7 +6,9 @@ from app.models.auth import (  # noqa: F401
     RefreshTokens,
 )
 from app.models.company import CompanyMaster  # noqa: F401
+from app.models.hr import EmployeeUploadBatch  # noqa: F401
 from app.models.language import LanguageMaster  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
 from app.models.role import RoleMaster  # noqa: F401
 from app.models.training import (  # noqa: F401
     AssessmentOption,

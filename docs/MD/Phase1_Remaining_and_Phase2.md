@@ -1074,8 +1074,6 @@ git push origin develop
 
 ---
 
-# DONE
-
 ---
 
 # PHASE 2 — CONTENT & LEARNING (Week 6–9)
@@ -1429,7 +1427,8 @@ Add `boto3` to `backend/requirements.txt`:
 
 ```
 boto3==1.35.0
-python-magic-bin
+python-magic-bin(windows)
+python-magic(c/git)
 ```
 
 ---
