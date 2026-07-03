@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.analytics import router as analytics_router
 from app.api.v1.assessments import router as assessments_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.certificates import router as certificates_router
 from app.api.v1.company import router as company_router
 from app.api.v1.hr import router as hr_router
 from app.api.v1.users import router as users_router
@@ -25,6 +27,8 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(videos_router, prefix="/api/v1")
 app.include_router(assessments_router, prefix="/api/v1")
 app.include_router(hr_router, prefix="/api/v1")
+app.include_router(certificates_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
 
 
 @app.get("/health")

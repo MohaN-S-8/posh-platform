@@ -9,10 +9,13 @@ from app.models.training import (
     TrainingHistory,
 )
 from app.schemas.assessment import AssessmentSubmit
+from app.services.certificate_service import CertificateService
 
 
 class AssessmentService:
-    async def submit(self, db: AsyncSession, user_id: int, data: AssessmentSubmit) -> dict:
+    async def submit(
+        self, db: AsyncSession, user_id: int, data: AssessmentSubmit, company_id: int
+    ) -> dict:
         """Submit assessment answers. Video must be completed first."""
 
         # 1. Verify video is completed
@@ -81,8 +84,18 @@ class AssessmentService:
 
         # 5. Trigger certificate generation on Pass
         if result == "Pass":
-            # TODO: Celery task for certificate generation (Phase 4)
-            response["message"] = "Congratulations! Your certificate is being generated."
+            cert_service = CertificateService()
+            try:
+                cert = await cert_service.generate_certificate(
+                    db, user_id, data.video_id, company_id
+                )
+                response["certificate_number"] = cert.certificate_number
+                response["message"] = (
+                    f"Congratulations! Certificate {cert.certificate_number} generated."
+                )
+            except Exception:
+                # Don't fail the assessment if certificate generation fails
+                response["message"] = "Assessment passed. Certificate generation in progress."
         else:
             response["message"] = (
                 f"Score: {score:.1f}%. You need {passing_score}% to pass. Please retry."

@@ -859,6 +859,8 @@ git push origin develop
 
 ---
 
+## DONE
+
 # PHASE 4 — CERTIFICATES + ANALYTICS (Week 13–15)
 
 **What we build:**
@@ -1685,6 +1687,7 @@ def test_analytics_requires_auth():
 cd backend
 black .
 ruff check --fix .
+ruff check --fix --unsafe-fixes .
 ruff check .
 pytest tests/ -v
 cd ..

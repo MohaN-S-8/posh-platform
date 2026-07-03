@@ -9,6 +9,7 @@ from alembic import context
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.base import Base
+from app.models.analytics import AnalyticsSummary  # noqa: F401
 from app.models.auth import (  # noqa: F401
     AccountLockout,
     LoginAttempts,
@@ -16,6 +17,7 @@ from app.models.auth import (  # noqa: F401
     PasswordResetTokens,
     RefreshTokens,
 )
+from app.models.certificate import Certificate, CertificateTemplate  # noqa: F401
 from app.models.company import CompanyMaster  # noqa: F401
 from app.models.hr import EmployeeUploadBatch  # noqa: F401
 from app.models.language import LanguageMaster  # noqa: F401

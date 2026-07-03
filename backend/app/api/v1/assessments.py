@@ -21,4 +21,5 @@ async def submit_assessment(
     Assessment is locked until video is 95%+ complete.
     Returns score, pass/fail, and triggers certificate on Pass.
     """
-    return await assessment_service.submit(db, current_user.user_id, data)
+
+    return await assessment_service.submit(db, current_user.user_id, data, current_user.company_id)
