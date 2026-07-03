@@ -46,7 +46,18 @@ class UserService:
             )
 
         # Generate temporary password
-        temp_password = "Temp@1234"  # TODO: send via email in Phase 3
+        # temp_password = "Temp@1234"
+        import secrets
+        import string
+
+        # Generate a secure random temporary password
+        alphabet = string.ascii_letters + string.digits + "!@#$"
+        temp_password = (
+            secrets.choice(string.ascii_uppercase)
+            + secrets.choice(string.digits)
+            + secrets.choice("!@#$")
+            + "".join(secrets.choice(alphabet) for _ in range(9))
+        )
         user = UserMaster(
             **data.model_dump(),
             username=data.email,
@@ -55,6 +66,17 @@ class UserService:
         )
         db.add(user)
         await db.commit()
+        from app.core.email import send_welcome_email
+
+        try:
+            await send_welcome_email(
+                to=user.email,
+                first_name=user.first_name,
+                temp_password=temp_password,
+            )
+        except Exception:
+            pass
+
         await db.refresh(user)
         return user
 

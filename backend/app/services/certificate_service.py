@@ -90,6 +90,19 @@ class CertificateService:
         db.add(certificate)
         await db.commit()
         await db.refresh(certificate)
+        from app.core.email import send_certificate_email
+
+        try:
+            await send_certificate_email(
+                to=user.email,
+                first_name=user.first_name,
+                course_name=video.title,
+                cert_number=cert_number,
+                pdf_bytes=pdf_bytes,
+            )
+        except Exception:
+            pass  # Don't fail certificate generation if email fails
+
         return certificate
 
     def _generate_qr(self, url: str) -> bytes:

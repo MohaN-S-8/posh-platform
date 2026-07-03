@@ -857,9 +857,7 @@ git commit -m "feat(phase3): HR portal — bulk upload, training assignment, com
 git push origin develop
 ```
 
----
 
-## DONE
 
 # PHASE 4 — CERTIFICATES + ANALYTICS (Week 13–15)
 
@@ -1700,7 +1698,9 @@ git add .
 git commit -m "feat(phase4): certificate PDF+QR generation, public verification, analytics dashboard"
 git push origin develop
 ```
+---
 
+## DONE
 ---
 
 ## Phase 3 + Phase 4 Complete ✅ Checklist

@@ -9,7 +9,6 @@ from app.models.training import (
     TrainingHistory,
 )
 from app.schemas.assessment import AssessmentSubmit
-from app.services.certificate_service import CertificateService
 
 
 class AssessmentService:
@@ -83,22 +82,18 @@ class AssessmentService:
         }
 
         # 5. Trigger certificate generation on Pass
+        # 5. Trigger certificate generation on Pass (via Celery — non-blocking)
         if result == "Pass":
-            cert_service = CertificateService()
-            try:
-                cert = await cert_service.generate_certificate(
-                    db, user_id, data.video_id, company_id
-                )
-                response["certificate_number"] = cert.certificate_number
-                response["message"] = (
-                    f"Congratulations! Certificate {cert.certificate_number} generated."
-                )
-            except Exception:
-                # Don't fail the assessment if certificate generation fails
-                response["message"] = "Assessment passed. Certificate generation in progress."
+            from app.workers.celery_app import generate_certificate_task
+
+            generate_certificate_task.delay(user_id, data.video_id, company_id)
+            response["message"] = (
+                "Congratulations! You passed. "
+                "Your certificate is being generated and will be emailed to you."
+            )
         else:
             response["message"] = (
-                f"Score: {score:.1f}%. You need {passing_score}% to pass. Please retry."
+                f"Score: {score:.1f}%. " f"You need {passing_score}% to pass. Please retry."
             )
 
         return response

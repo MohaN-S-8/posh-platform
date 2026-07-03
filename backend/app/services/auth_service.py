@@ -58,9 +58,21 @@ class AuthService:
         db.add(otp_record)
         await db.commit()
 
+        from app.core.email import send_otp_email
+
+        try:
+            await send_otp_email(
+                to=data.email.lower(),
+                first_name=data.first_name,
+                otp=raw_otp,
+            )
+        except Exception:
+            # Don't expose email errors to the client
+            pass  # MailHog may not be running in some environments
+
         return {
-            "message": "OTP sent to your email. Please verify to complete registration.",
-            "dev_otp": raw_otp,  # REMOVE IN PRODUCTION
+            "message": "OTP sent to your email. Please verify to complete registration."
+            # raw_otp is NOT returned anymore
         }
 
     async def verify_otp(self, db: AsyncSession, email: str, otp: str) -> dict:
@@ -275,12 +287,18 @@ class AuthService:
         db.add(reset_record)
         await db.commit()
 
-        # TODO: Send email with reset link (Celery task in Phase 3)
-        # Reset URL: http://localhost:3000/reset-password?token={raw_token}
-        return {
-            "message": "If this email is registered, you will receive reset instructions.",
-            "dev_reset_token": raw_token,  # REMOVE IN PRODUCTION
-        }
+        from app.core.email import send_password_reset_email
+
+        try:
+            await send_password_reset_email(
+                to=user.email,
+                first_name=user.first_name,
+                reset_token=raw_token,
+            )
+        except Exception:
+            pass
+
+        return {"message": "If this email is registered, you will receive reset instructions."}
 
     async def reset_password(self, db: AsyncSession, token: str, new_password: str) -> dict:
         """Reset password using the token from email."""
