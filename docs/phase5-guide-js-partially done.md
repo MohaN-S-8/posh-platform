@@ -2251,8 +2251,6 @@ git push origin develop
 
 ---
 
-## DONE
-
 # PHASE 5C — SECURITY HARDENING
 
 _(Unchanged — backend/Nginx, not affected by the JS/TS conversion)_
@@ -2490,7 +2488,10 @@ APP_ENV=production
 FRONTEND_URL=https://yourdomain.com
 BACKEND_CORS_ORIGINS=["https://yourdomain.com"]
 ```
+---
 
+## DONE
+i done upto this in the p[hase 5 i fel like otp not coming fro gmail also in the envs we need to fill the gaps with real time apis and etc like viedos admin,hr,employee. all these are missingis'it?]
 ## STEP 66: Deploy to a Cloud VM
 
 These steps work on any provider (AWS EC2, Azure VM, GCP Compute Engine, DigitalOcean Droplet).

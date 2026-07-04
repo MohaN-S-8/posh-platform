@@ -188,6 +188,7 @@ class HRService:
                 select(CourseAssignment).where(
                     CourseAssignment.video_id == data.video_id,
                     CourseAssignment.assigned_to_user_id == data.assigned_to_user_id,
+                    CourseAssignment.assign_type == "Individual",
                 )
             )
             if existing.scalar_one_or_none():

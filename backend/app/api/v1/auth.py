@@ -22,7 +22,7 @@ auth_service = AuthService()
 
 @router.post("/signup")
 @limiter.limit("5/minute")
-async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
+async def signup(request: Request, data: SignupRequest, db: AsyncSession = Depends(get_db)):
     """Register a new user. Sends OTP to email for verification."""
     return await auth_service.signup(db, data)
 

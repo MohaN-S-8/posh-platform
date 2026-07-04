@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -16,12 +17,25 @@ class VideoResponse(BaseModel):
     description: Optional[str]
     status: str
     duration_minutes: Optional[int]
-    created_date: Optional[str] = None
+    created_date: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
 class ProgressUpdate(BaseModel):
-    current_position: int  # current playback position in seconds
-    total_duration: int  # total video length in seconds
+    current_position: int
+    total_duration: int
+
+
+class VideoListResponse(BaseModel):
+    video_id: int
+    title: str
+    description: Optional[str]
+    status: str
+    duration_minutes: Optional[int]
+    storage_type: Optional[str]
+    created_date: Optional[datetime]
+
+    class Config:
+        from_attributes = True

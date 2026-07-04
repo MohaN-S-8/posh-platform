@@ -27,9 +27,15 @@ class CompanyService:
         return company
 
     async def create(self, db: AsyncSession, data: CompanyCreate) -> CompanyMaster:
+        data_dict = data.model_dump()
+
+        # Normalize company_code
+        if "company_code" in data_dict and data_dict["company_code"]:
+            data_dict["company_code"] = data_dict["company_code"].upper()
+
         # Check duplicate code
         existing = await db.execute(
-            select(CompanyMaster).where(CompanyMaster.company_code == data.company_code.upper())
+            select(CompanyMaster).where(CompanyMaster.company_code == data_dict["company_code"])
         )
         if existing.scalar_one_or_none():
             raise HTTPException(
@@ -38,10 +44,10 @@ class CompanyService:
             )
 
         company = CompanyMaster(
-            **data.model_dump(),
-            company_code=data.company_code.upper(),
+            **data_dict,
             status="Active",
         )
+
         db.add(company)
         await db.commit()
         await db.refresh(company)

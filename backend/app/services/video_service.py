@@ -209,3 +209,23 @@ class VideoService:
         video.status = "Published"
         await db.commit()
         return video
+
+    async def list_videos(self, db: AsyncSession, company_id: int):
+        result = await db.execute(
+            select(VideoMaster)
+            .where(VideoMaster.company_id == company_id)
+            .order_by(VideoMaster.created_date.desc())
+        )
+        return result.scalars().all()
+
+    async def list_published_videos(self, db: AsyncSession, company_id: int) -> list:
+        """List only published videos — used by HR assignment dropdown."""
+        result = await db.execute(
+            select(VideoMaster)
+            .where(
+                VideoMaster.company_id == company_id,
+                VideoMaster.status == "Published",
+            )
+            .order_by(VideoMaster.title)
+        )
+        return result.scalars().all()

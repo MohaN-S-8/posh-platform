@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # No ports exposed — only accessible internally
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    # No ports exposed
+
+  minio:
+    image: minio/minio:latest
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    # No ports exposed — only accessible internally
+
+  backend:
+    image: ghcr.io/YOUR_USERNAME/posh-backend:latest
+    restart: always
+    env_file: .env.prod
+    depends_on:
+      - mysql
+      - redis
+      - minio
+    # No --reload in production
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+  celery-worker:
+    image: ghcr.io/YOUR_USERNAME/posh-backend:latest
+    restart: always
+    env_file: .env.prod
+    depends_on:
+      - redis
+      - mysql
+    command: celery -A app.workers.celery_app worker --loglevel=warning --concurrency=4
+
+  frontend:
+    image: ghcr.io/YOUR_USERNAME/posh-frontend:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro # TLS certificates
+
+volumes:
+  mysql_data:
+  minio_data:

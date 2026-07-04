@@ -44,3 +44,6 @@ desktop.ini
 
 # Docker
 *.log
+.env.prod
+.env.example
+doc/
