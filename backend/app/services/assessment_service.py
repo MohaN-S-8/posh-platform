@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.training import (
@@ -10,10 +10,37 @@ from app.models.training import (
     TrainingHistory,
 )
 from app.models.video import VideoMaster
-from app.schemas.assessment import AssessmentSubmit
+from app.schemas.assessment import AssessmentQuestionCreate, AssessmentSubmit
 
 
 class AssessmentService:
+    async def availability(
+        self, db: AsyncSession, video_id: int, user_id: int, company_id: int
+    ) -> dict:
+        history_result = await db.execute(
+            select(TrainingHistory).where(
+                TrainingHistory.user_id == user_id,
+                TrainingHistory.video_id == video_id,
+                TrainingHistory.company_id == company_id,
+            )
+        )
+        history = history_result.scalar_one_or_none()
+        question_count_result = await db.execute(
+            select(func.count()).where(AssessmentQuestion.video_id == video_id)
+        )
+        question_count = question_count_result.scalar() or 0
+        completed = bool(history and history.status == "Completed")
+        return {
+            "available": completed and question_count > 0,
+            "video_completed": completed,
+            "question_count": question_count,
+            "message": (
+                "Assessment is available."
+                if completed and question_count > 0
+                else "Please complete the training video before taking the assessment."
+            ),
+        }
+
     async def questions(self, db: AsyncSession, video_id: int, company_id: int) -> list[dict]:
         video_result = await db.execute(
             select(VideoMaster).where(
@@ -141,3 +168,63 @@ class AssessmentService:
             )
 
         return response
+
+    async def create_question(
+        self, db: AsyncSession, data: AssessmentQuestionCreate, company_id: int
+    ) -> dict:
+        video_result = await db.execute(
+            select(VideoMaster.video_id).where(
+                VideoMaster.video_id == data.video_id,
+                VideoMaster.company_id == company_id,
+            )
+        )
+        if not video_result.scalar_one_or_none():
+            raise HTTPException(404, "Video not found for this company.")
+
+        if not data.options:
+            raise HTTPException(400, "At least one option is required.")
+
+        correct = data.correct_option.strip().upper()
+        option_labels = {option.option_label.strip().upper() for option in data.options}
+        if correct not in option_labels:
+            raise HTTPException(400, "Correct option must match one of the option labels.")
+
+        question = AssessmentQuestion(
+            video_id=data.video_id,
+            question_text=data.question_text.strip(),
+            question_type=data.question_type,
+            correct_option=correct,
+        )
+        db.add(question)
+        await db.flush()
+
+        for option in data.options:
+            db.add(
+                AssessmentOption(
+                    question_id=question.question_id,
+                    option_label=option.option_label.strip().upper(),
+                    option_text=option.option_text.strip(),
+                )
+            )
+        await db.commit()
+        return {"message": "Assessment question created.", "question_id": question.question_id}
+
+    async def delete_question(self, db: AsyncSession, question_id: int, company_id: int) -> dict:
+        question_result = await db.execute(
+            select(AssessmentQuestion)
+            .join(VideoMaster, VideoMaster.video_id == AssessmentQuestion.video_id)
+            .where(
+                AssessmentQuestion.question_id == question_id,
+                VideoMaster.company_id == company_id,
+            )
+        )
+        question = question_result.scalar_one_or_none()
+        if not question:
+            raise HTTPException(404, "Assessment question not found.")
+
+        await db.execute(
+            delete(AssessmentOption).where(AssessmentOption.question_id == question_id)
+        )
+        await db.delete(question)
+        await db.commit()
+        return {"message": "Assessment question deleted."}

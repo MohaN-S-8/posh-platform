@@ -14,6 +14,9 @@ export function VideoListPage() {
   const [uploadProgress, setUploadProgress] = useState("");
   const [overlay, setOverlay] = useState(null);
   const [lastUploadedVideo, setLastUploadedVideo] = useState(null);
+  const [languages, setLanguages] = useState([]);
+  const [assetForms, setAssetForms] = useState({});
+  const [questionForms, setQuestionForms] = useState({});
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -41,6 +44,10 @@ export function VideoListPage() {
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
       fetchVideos({ showLoading: false });
+      apiClient
+        .get("/admin/languages")
+        .then((res) => setLanguages(res.data || []))
+        .catch(() => setLanguages([]));
     }, 0);
     return () => window.clearTimeout(loadTimer);
   }, []);
@@ -99,6 +106,111 @@ export function VideoListPage() {
       setUploadProgress("");
     } finally {
       setUploading(false);
+      setOverlay(null);
+    }
+  };
+
+  const updateAssetForm = (videoId, patch) => {
+    setAssetForms((current) => ({
+      ...current,
+      [videoId]: {
+        quality_label: "720p",
+        language_id: "1",
+        qualityFile: null,
+        subtitleFile: null,
+        audioFile: null,
+        ...(current[videoId] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const defaultQuestionForm = {
+    question_text: "",
+    question_type: "MCQ",
+    correct_option: "A",
+    options: [
+      { option_label: "A", option_text: "" },
+      { option_label: "B", option_text: "" },
+      { option_label: "C", option_text: "" },
+      { option_label: "D", option_text: "" },
+    ],
+  };
+
+  const updateQuestionForm = (videoId, patch) => {
+    setQuestionForms((current) => ({
+      ...current,
+      [videoId]: {
+        ...defaultQuestionForm,
+        ...(current[videoId] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const uploadQualityVariant = async (videoId) => {
+    const asset = assetForms[videoId];
+    if (!asset?.qualityFile) {
+      setError("Please select a quality video file.");
+      return;
+    }
+    setOverlay({ title: "Uploading quality", message: "Uploading the selected video variant." });
+    setError("");
+    const formData = new FormData();
+    formData.append("file", asset.qualityFile);
+    formData.append("quality_label", asset.quality_label || "720p");
+    try {
+      await apiClient.post(`/videos/${videoId}/qualities`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      updateAssetForm(videoId, { qualityFile: null });
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to upload quality variant.");
+    } finally {
+      setOverlay(null);
+    }
+  };
+
+  const uploadLanguageTrack = async (videoId) => {
+    const asset = assetForms[videoId];
+    if (!asset?.subtitleFile && !asset?.audioFile) {
+      setError("Please select a subtitle or audio file.");
+      return;
+    }
+    setOverlay({ title: "Uploading language track", message: "Uploading subtitle/audio files." });
+    setError("");
+    const formData = new FormData();
+    formData.append("language_id", asset.language_id || "1");
+    if (asset.subtitleFile) formData.append("subtitle_file", asset.subtitleFile);
+    if (asset.audioFile) formData.append("audio_file", asset.audioFile);
+    try {
+      await apiClient.post(`/videos/${videoId}/language-tracks`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      updateAssetForm(videoId, { subtitleFile: null, audioFile: null });
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to upload language track.");
+    } finally {
+      setOverlay(null);
+    }
+  };
+
+  const createQuestion = async (videoId) => {
+    const form = questionForms[videoId] || defaultQuestionForm;
+    setOverlay({ title: "Saving question", message: "Adding this assessment question." });
+    setError("");
+    try {
+      await apiClient.post("/assessments/questions", {
+        video_id: videoId,
+        question_text: form.question_text,
+        question_type: form.question_type,
+        correct_option: form.correct_option,
+        options: form.options,
+      });
+      updateQuestionForm(videoId, defaultQuestionForm);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to create assessment question.");
+    } finally {
       setOverlay(null);
     }
   };
@@ -372,7 +484,7 @@ export function VideoListPage() {
                   borderRadius: "8px",
                 }}
               >
-                <div>
+                <div style={{ flex: "1 1 280px" }}>
                   <h4 style={{ color: "#17324d", margin: "0 0 6px" }}>
                     {video.title}
                   </h4>
@@ -382,6 +494,140 @@ export function VideoListPage() {
                       ? ` - ${video.duration_minutes} min`
                       : ""}
                   </p>
+                  <div style={toolsGridStyle}>
+                    <div style={toolBoxStyle}>
+                      <strong style={toolTitleStyle}>Quality Variant</strong>
+                      <select
+                        value={assetForms[video.video_id]?.quality_label || "720p"}
+                        onChange={(e) =>
+                          updateAssetForm(video.video_id, { quality_label: e.target.value })
+                        }
+                        style={compactInputStyle}
+                      >
+                        {["360p", "480p", "720p", "1080p"].map((quality) => (
+                          <option key={quality} value={quality}>
+                            {quality}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="file"
+                        accept=".mp4,.avi,.mov"
+                        onChange={(e) =>
+                          updateAssetForm(video.video_id, {
+                            qualityFile: e.target.files?.[0] || null,
+                          })
+                        }
+                        style={fileInputStyle}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => uploadQualityVariant(video.video_id)}
+                        style={smallButtonStyle}
+                      >
+                        Upload Quality
+                      </button>
+                    </div>
+                    <div style={toolBoxStyle}>
+                      <strong style={toolTitleStyle}>Language Track</strong>
+                      <select
+                        value={assetForms[video.video_id]?.language_id || "1"}
+                        onChange={(e) =>
+                          updateAssetForm(video.video_id, { language_id: e.target.value })
+                        }
+                        style={compactInputStyle}
+                      >
+                        {(languages.length ? languages : [{ language_id: 1, language_name: "English" }]).map(
+                          (language) => (
+                            <option key={language.language_id} value={language.language_id}>
+                              {language.language_name}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                      <input
+                        type="file"
+                        accept=".vtt,.txt"
+                        onChange={(e) =>
+                          updateAssetForm(video.video_id, {
+                            subtitleFile: e.target.files?.[0] || null,
+                          })
+                        }
+                        style={fileInputStyle}
+                      />
+                      <input
+                        type="file"
+                        accept=".mp3,.m4a,.aac,.wav"
+                        onChange={(e) =>
+                          updateAssetForm(video.video_id, {
+                            audioFile: e.target.files?.[0] || null,
+                          })
+                        }
+                        style={fileInputStyle}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => uploadLanguageTrack(video.video_id)}
+                        style={smallButtonStyle}
+                      >
+                        Upload Language
+                      </button>
+                    </div>
+                    <div style={toolBoxStyle}>
+                      <strong style={toolTitleStyle}>Assessment Question</strong>
+                      <textarea
+                        rows={2}
+                        placeholder="Question text"
+                        value={
+                          (questionForms[video.video_id] || defaultQuestionForm).question_text
+                        }
+                        onChange={(e) =>
+                          updateQuestionForm(video.video_id, { question_text: e.target.value })
+                        }
+                        style={{ ...compactInputStyle, resize: "vertical" }}
+                      />
+                      {(questionForms[video.video_id] || defaultQuestionForm).options.map(
+                        (option, index) => (
+                          <input
+                            key={option.option_label}
+                            placeholder={`${option.option_label} option`}
+                            value={option.option_text}
+                            onChange={(e) => {
+                              const current =
+                                questionForms[video.video_id] || defaultQuestionForm;
+                              const nextOptions = current.options.map((row, rowIndex) =>
+                                rowIndex === index
+                                  ? { ...row, option_text: e.target.value }
+                                  : row,
+                              );
+                              updateQuestionForm(video.video_id, { options: nextOptions });
+                            }}
+                            style={compactInputStyle}
+                          />
+                        ),
+                      )}
+                      <select
+                        value={(questionForms[video.video_id] || defaultQuestionForm).correct_option}
+                        onChange={(e) =>
+                          updateQuestionForm(video.video_id, { correct_option: e.target.value })
+                        }
+                        style={compactInputStyle}
+                      >
+                        {["A", "B", "C", "D"].map((label) => (
+                          <option key={label} value={label}>
+                            Correct: {label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => createQuestion(video.video_id)}
+                        style={smallButtonStyle}
+                      >
+                        Add Question
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span
@@ -443,4 +689,49 @@ const inputStyle = {
   borderRadius: "6px",
   fontSize: "14px",
   boxSizing: "border-box",
+};
+
+const toolsGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "12px",
+  marginTop: "14px",
+};
+
+const toolBoxStyle = {
+  border: "1px solid #e2e8f0",
+  borderRadius: "8px",
+  padding: "12px",
+  display: "grid",
+  gap: "8px",
+};
+
+const toolTitleStyle = {
+  color: "#17324d",
+  fontSize: "13px",
+};
+
+const compactInputStyle = {
+  width: "100%",
+  padding: "8px 10px",
+  border: "1px solid #d8e1ea",
+  borderRadius: "6px",
+  fontSize: "13px",
+  boxSizing: "border-box",
+};
+
+const fileInputStyle = {
+  fontSize: "12px",
+  color: "#64748b",
+};
+
+const smallButtonStyle = {
+  padding: "8px 10px",
+  background: "#17324d",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontWeight: 700,
+  fontSize: "12px",
 };

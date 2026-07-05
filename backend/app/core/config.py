@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     FRONTEND_URL: str = "http://localhost:80"
     PUBLIC_APP_URL: str = "http://localhost:80"
+
+    # Microsoft Entra ID / Azure AD SSO
+    ENTRA_TENANT_ID: str = ""
+    ENTRA_CLIENT_ID: str = ""
+    ENTRA_CLIENT_SECRET: str = ""
+    ENTRA_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/sso/entra/callback"
     # App
     APP_ENV: str = "development"
 

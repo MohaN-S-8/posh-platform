@@ -15,12 +15,26 @@ from app.schemas.video import VideoCreate
 
 ALLOWED_MIME_TYPES = {"video/mp4", "video/x-msvideo", "video/quicktime"}
 ALLOWED_EXTENSIONS = {".mp4", ".avi", ".mov"}
+ALLOWED_AUDIO_MIME_TYPES = {"audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav", "audio/aac"}
+ALLOWED_SUBTITLE_MIME_TYPES = {"text/vtt", "text/plain", "application/octet-stream"}
 MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024  # 500 MB
 
 VIDEO_BUCKET = os.environ.get("MINIO_BUCKET_VIDEOS", "posh-videos")
 
 
 class VideoService:
+    async def _get_company_video(self, db: AsyncSession, video_id: int, company_id: int):
+        result = await db.execute(
+            select(VideoMaster).where(
+                VideoMaster.video_id == video_id,
+                VideoMaster.company_id == company_id,
+            )
+        )
+        video = result.scalar_one_or_none()
+        if not video:
+            raise HTTPException(404, "Video not found.")
+        return video
+
     async def upload_video(
         self,
         db: AsyncSession,
@@ -106,6 +120,134 @@ class VideoService:
             )
         await db.commit()
         return video
+
+    async def upload_quality_variant(
+        self,
+        db: AsyncSession,
+        video_id: int,
+        company_id: int,
+        file: UploadFile,
+        quality_label: str,
+    ) -> dict:
+        await self._get_company_video(db, video_id, company_id)
+        if quality_label not in {"360p", "480p", "720p", "1080p"}:
+            raise HTTPException(400, "Quality must be 360p, 480p, 720p, or 1080p.")
+
+        file_bytes = await file.read()
+        if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(400, "File size exceeds maximum limit of 500MB.")
+
+        mime_type = magic.from_buffer(file_bytes[:2048], mime=True)
+        if mime_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(400, f"Unsupported video format. Got: {mime_type}")
+
+        file_ext = os.path.splitext(file.filename or "variant.mp4")[1].lower()
+        object_key = (
+            f"videos/{company_id}/qualities/{video_id}-{quality_label}-{uuid.uuid4()}{file_ext}"
+        )
+        upload_file(file_bytes, VIDEO_BUCKET, object_key, mime_type)
+        await db.execute(
+            text(
+                """
+                INSERT INTO video_quality (video_id, company_id, quality_label, video_path, mime_type)
+                VALUES (:video_id, :company_id, :quality_label, :video_path, :mime_type)
+                ON DUPLICATE KEY UPDATE
+                    video_path = VALUES(video_path),
+                    mime_type = VALUES(mime_type)
+                """
+            ),
+            {
+                "video_id": video_id,
+                "company_id": company_id,
+                "quality_label": quality_label,
+                "video_path": object_key,
+                "mime_type": mime_type,
+            },
+        )
+        await db.commit()
+        return {"message": f"{quality_label} quality uploaded.", "quality_label": quality_label}
+
+    async def upload_language_track(
+        self,
+        db: AsyncSession,
+        video_id: int,
+        company_id: int,
+        language_id: int,
+        subtitle_file: Optional[UploadFile] = None,
+        audio_file: Optional[UploadFile] = None,
+    ) -> dict:
+        await self._get_company_video(db, video_id, company_id)
+        if not subtitle_file and not audio_file:
+            raise HTTPException(400, "Upload a subtitle file, audio file, or both.")
+
+        subtitle_key = None
+        audio_key = None
+        if subtitle_file:
+            subtitle_bytes = await subtitle_file.read()
+            subtitle_mime = magic.from_buffer(subtitle_bytes[:2048], mime=True)
+            if subtitle_mime not in ALLOWED_SUBTITLE_MIME_TYPES:
+                raise HTTPException(400, f"Unsupported subtitle format. Got: {subtitle_mime}")
+            subtitle_key = (
+                f"videos/{company_id}/subtitles/{video_id}-{language_id}-{uuid.uuid4()}.vtt"
+            )
+            body = subtitle_bytes
+            if not subtitle_bytes.lstrip().startswith(b"WEBVTT"):
+                text_body = subtitle_bytes.decode("utf-8", errors="ignore").strip()
+                body = f"WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n{text_body}".encode("utf-8")
+            upload_file(body, VIDEO_BUCKET, subtitle_key, "text/vtt")
+
+        if audio_file:
+            audio_bytes = await audio_file.read()
+            audio_mime = magic.from_buffer(audio_bytes[:2048], mime=True)
+            if audio_mime not in ALLOWED_AUDIO_MIME_TYPES:
+                raise HTTPException(400, f"Unsupported audio format. Got: {audio_mime}")
+            audio_ext = os.path.splitext(audio_file.filename or "audio.mp3")[1].lower()
+            audio_key = (
+                f"videos/{company_id}/audio/{video_id}-{language_id}-{uuid.uuid4()}{audio_ext}"
+            )
+            upload_file(audio_bytes, VIDEO_BUCKET, audio_key, audio_mime)
+
+        existing = await db.execute(
+            text(
+                """
+                SELECT id, subtitle_path, audio_url
+                FROM video_language
+                WHERE video_id = :video_id AND language_id = :language_id
+                LIMIT 1
+                """
+            ),
+            {"video_id": video_id, "language_id": language_id},
+        )
+        row = existing.first()
+        if row:
+            await db.execute(
+                text(
+                    """
+                    UPDATE video_language
+                    SET subtitle_path = COALESCE(:subtitle_path, subtitle_path),
+                        audio_url = COALESCE(:audio_url, audio_url)
+                    WHERE id = :id
+                    """
+                ),
+                {"id": row.id, "subtitle_path": subtitle_key, "audio_url": audio_key},
+            )
+        else:
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO video_language (video_id, language_id, subtitle_path, audio_url)
+                    VALUES (:video_id, :language_id, :subtitle_path, :audio_url)
+                    """
+                ),
+                {
+                    "video_id": video_id,
+                    "language_id": language_id,
+                    "subtitle_path": subtitle_key,
+                    "audio_url": audio_key,
+                },
+            )
+        await db.commit()
+        return {"message": "Language track uploaded.", "language_id": language_id}
 
     async def get_stream_url(
         self, db: AsyncSession, video_id: int, user_id: int, company_id: int
@@ -202,7 +344,7 @@ class VideoService:
         subtitle_result = await db.execute(
             text(
                 """
-                SELECT vl.language_id, lm.language_name, vl.subtitle_path
+                SELECT vl.language_id, lm.language_name, vl.subtitle_path, vl.audio_url
                 FROM video_language vl
                 JOIN language_master lm ON lm.language_id = vl.language_id
                 WHERE vl.video_id = :video_id AND vl.subtitle_path IS NOT NULL
@@ -214,7 +356,16 @@ class VideoService:
             {
                 "language_id": row.language_id,
                 "language_name": row.language_name,
-                "subtitle_url": generate_presigned_url(VIDEO_BUCKET, row.subtitle_path, 300),
+                "subtitle_url": (
+                    generate_presigned_url(VIDEO_BUCKET, row.subtitle_path, 300)
+                    if row.subtitle_path
+                    else None
+                ),
+                "audio_url": (
+                    generate_presigned_url(VIDEO_BUCKET, row.audio_url, 300)
+                    if row.audio_url
+                    else None
+                ),
             }
             for row in subtitle_result
         ]

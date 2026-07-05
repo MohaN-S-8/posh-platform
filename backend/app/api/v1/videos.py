@@ -97,6 +97,64 @@ async def publish_video(
     return result
 
 
+@router.post("/{video_id}/qualities")
+async def upload_video_quality_variant(
+    video_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    quality_label: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("videos.manage")),
+):
+    """Admin: upload/replace an actual quality variant for a video."""
+    result = await video_service.upload_quality_variant(
+        db, video_id, current_user.company_id, file, quality_label
+    )
+    await write_audit_log(
+        db,
+        user_id=current_user.user_id,
+        company_id=current_user.company_id,
+        action="VIDEO_QUALITY_UPLOADED",
+        table_name="video_quality",
+        record_id=video_id,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return result
+
+
+@router.post("/{video_id}/language-tracks")
+async def upload_video_language_track(
+    video_id: int,
+    request: Request,
+    language_id: int = Form(...),
+    subtitle_file: UploadFile = File(None),
+    audio_file: UploadFile = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_permission("videos.manage")),
+):
+    """Admin: upload subtitles and/or dubbed audio for a video language."""
+    result = await video_service.upload_language_track(
+        db,
+        video_id,
+        current_user.company_id,
+        language_id,
+        subtitle_file,
+        audio_file,
+    )
+    await write_audit_log(
+        db,
+        user_id=current_user.user_id,
+        company_id=current_user.company_id,
+        action="VIDEO_LANGUAGE_TRACK_UPLOADED",
+        table_name="video_language",
+        record_id=video_id,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return result
+
+
 @router.patch("/{video_id}/archive")
 async def archive_video(
     video_id: int,

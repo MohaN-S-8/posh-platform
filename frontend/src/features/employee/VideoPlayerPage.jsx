@@ -43,6 +43,7 @@ export function VideoPlayerPage() {
   const { videoId } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const playerRef = useRef(null);
   const progressTimer = useRef(0);
   const maxWatched = useRef(0);
@@ -60,6 +61,7 @@ export function VideoPlayerPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [selectedQuality, setSelectedQuality] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("English");
 
   useEffect(() => {
     apiClient
@@ -67,6 +69,7 @@ export function VideoPlayerPage() {
       .then((res) => {
         setStream(res.data);
         setSelectedQuality(res.data.qualities?.[0]?.label || "source");
+        setSelectedLanguage(res.data.subtitles?.[0]?.language_name || "English");
         setCompletion(res.data.completion_percent || 0);
         setUnlocked((res.data.completion_percent || 0) >= 95);
         maxWatched.current = Math.max(
@@ -117,6 +120,10 @@ export function VideoPlayerPage() {
     setCurrentTime(video.currentTime);
     if (!blockedSeek.current && !video.seeking) {
       maxWatched.current = Math.max(maxWatched.current, video.currentTime);
+    }
+    const audio = audioRef.current;
+    if (audio && Math.abs(audio.currentTime - video.currentTime) > 0.5) {
+      audio.currentTime = video.currentTime;
     }
     const now = Date.now();
     if (!blockedSeek.current && now - progressTimer.current > 2000) {
@@ -183,6 +190,11 @@ export function VideoPlayerPage() {
     if (!video) return;
     try {
       await video.play();
+      if (audioRef.current) {
+        audioRef.current.currentTime = video.currentTime;
+        await audioRef.current.play();
+        video.muted = true;
+      }
       setIsPlaying(true);
       setStatus("Playing");
     } catch {
@@ -194,6 +206,7 @@ export function VideoPlayerPage() {
     const video = videoRef.current;
     if (!video) return;
     video.pause();
+    audioRef.current?.pause();
     setIsPlaying(false);
     setIsBuffering(false);
     saveProgress(video.currentTime, video.duration);
@@ -204,8 +217,12 @@ export function VideoPlayerPage() {
     const video = videoRef.current;
     if (!video) return;
     video.pause();
+    audioRef.current?.pause();
     internalSeek.current = true;
     video.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
     setCurrentTime(0);
     setIsPlaying(false);
     setIsBuffering(false);
@@ -227,6 +244,9 @@ export function VideoPlayerPage() {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
+    if (audioRef.current) {
+      audioRef.current.muted = video.muted;
+    }
     setIsMuted(video.muted);
   };
 
@@ -238,6 +258,35 @@ export function VideoPlayerPage() {
       video.volume = nextVolume;
       video.muted = nextVolume === 0;
       setIsMuted(video.muted);
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = nextVolume;
+      audioRef.current.muted = nextVolume === 0;
+    }
+  };
+
+  const changeLanguage = (event) => {
+    const languageName = event.target.value;
+    setSelectedLanguage(languageName);
+    const selected = stream?.subtitles?.find(
+      (subtitle) => subtitle.language_name === languageName,
+    );
+    const video = videoRef.current;
+    const audio = audioRef.current;
+    if (video && audio && selected?.audio_url) {
+      audio.currentTime = video.currentTime;
+      audio.volume = volume;
+      audio.muted = isMuted;
+      video.muted = true;
+      if (!video.paused) {
+        audio.play().catch(() => setStatus("Unable to play selected audio language."));
+      }
+    } else if (video && !selected?.audio_url) {
+      video.muted = isMuted;
+    }
+    const tracks = video?.textTracks || [];
+    for (let index = 0; index < tracks.length; index += 1) {
+      tracks[index].mode = tracks[index].label === languageName ? "showing" : "disabled";
     }
   };
 
@@ -286,6 +335,9 @@ export function VideoPlayerPage() {
   };
 
   const canOpenAssessment = unlocked || completion >= 95;
+  const selectedLanguageTrack = stream?.subtitles?.find(
+    (subtitle) => subtitle.language_name === selectedLanguage,
+  );
 
   return (
     <div style={{ padding: "32px", background: "#f6f8fb", minHeight: "100vh" }}>
@@ -361,6 +413,7 @@ export function VideoPlayerPage() {
                 onPause={() => {
                   setIsPlaying(false);
                   setIsBuffering(false);
+                  audioRef.current?.pause();
                 }}
                 onClick={isPlaying ? pauseVideo : playVideo}
                 style={{
@@ -376,17 +429,22 @@ export function VideoPlayerPage() {
                 {(stream.subtitles?.length
                   ? stream.subtitles
                   : [{ language_name: "English", subtitle_url: "data:text/vtt,WEBVTT%0A%0A" }]
-                ).map((subtitle, index) => (
-                  <track
-                    key={`${subtitle.language_name}-${index}`}
-                    kind="subtitles"
-                    src={subtitle.subtitle_url}
-                    srcLang={subtitle.language_name?.toLowerCase().slice(0, 2) || "en"}
-                    label={subtitle.language_name}
-                    default={index === 0}
-                  />
-                ))}
+                )
+                  .filter((subtitle) => subtitle.subtitle_url)
+                  .map((subtitle, index) => (
+                    <track
+                      key={`${subtitle.language_name}-${index}`}
+                      kind="subtitles"
+                      src={subtitle.subtitle_url}
+                      srcLang={subtitle.language_name?.toLowerCase().slice(0, 2) || "en"}
+                      label={subtitle.language_name}
+                      default={subtitle.language_name === selectedLanguage || index === 0}
+                    />
+                  ))}
               </video>
+              {selectedLanguageTrack?.audio_url && (
+                <audio ref={audioRef} src={selectedLanguageTrack.audio_url} preload="metadata" />
+              )}
               {isBuffering && (
                 <div
                   style={{
@@ -527,7 +585,12 @@ export function VideoPlayerPage() {
             </div>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <select style={selectStyle} value="en" onChange={() => {}} aria-label="Subtitle language">
+              <select
+                style={selectStyle}
+                value={selectedLanguage}
+                onChange={changeLanguage}
+                aria-label="Subtitle language"
+              >
                 {(stream?.subtitles?.length ? stream.subtitles : [{ language_name: "English" }]).map(
                   (subtitle) => (
                     <option key={subtitle.language_name} value={subtitle.language_name}>

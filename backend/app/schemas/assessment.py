@@ -13,6 +13,19 @@ class AssessmentSubmit(BaseModel):
     answers: list[AnswerSubmit]
 
 
+class AssessmentOptionCreate(BaseModel):
+    option_label: str
+    option_text: str
+
+
+class AssessmentQuestionCreate(BaseModel):
+    video_id: int
+    question_text: str
+    question_type: str = "MCQ"
+    correct_option: str
+    options: list[AssessmentOptionCreate]
+
+
 class AssessmentOptionResponse(BaseModel):
     option_id: int
     option_label: str

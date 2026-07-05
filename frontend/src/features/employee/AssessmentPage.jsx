@@ -11,13 +11,31 @@ export function AssessmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [availability, setAvailability] = useState(null);
 
   useEffect(() => {
-    apiClient
-      .get(`/assessments/${videoId}/questions`)
-      .then((res) => setQuestions(res.data))
-      .catch((err) => setError(err.response?.data?.detail || "Unable to load assessment."))
-      .finally(() => setLoading(false));
+    const loadAssessment = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const availableRes = await apiClient.get(`/assessments/${videoId}/availability`);
+        setAvailability(availableRes.data);
+        if (!availableRes.data.available) {
+          setError(
+            availableRes.data.message ||
+              "Please complete the training video before taking the assessment.",
+          );
+          return;
+        }
+        const questionRes = await apiClient.get(`/assessments/${videoId}/questions`);
+        setQuestions(questionRes.data);
+      } catch (err) {
+        setError(err.response?.data?.detail || "Unable to load assessment.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAssessment();
   }, [videoId]);
 
   const submit = async () => {
@@ -64,7 +82,28 @@ export function AssessmentPage() {
       {loading ? (
         <p style={{ color: "#666" }}>Loading assessment...</p>
       ) : error ? (
-        <p style={{ color: "#c0392b" }}>{error}</p>
+        <div style={{ background: "white", borderRadius: "8px", padding: "28px" }}>
+          <h3 style={{ color: "#c0392b", marginTop: 0 }}>Assessment Locked</h3>
+          <p style={{ color: "#666" }}>{error}</p>
+          {availability?.question_count === 0 && (
+            <p style={{ color: "#666" }}>No questions have been configured for this video yet.</p>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate(`/employee/video/${videoId}`)}
+            style={{
+              marginTop: "12px",
+              padding: "10px 18px",
+              background: "#17324d",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Back to Video
+          </button>
+        </div>
       ) : questions.length === 0 ? (
         <div style={{ background: "white", borderRadius: "8px", padding: "28px" }}>
           <h3 style={{ color: "#17324d", marginTop: 0 }}>No questions available</h3>

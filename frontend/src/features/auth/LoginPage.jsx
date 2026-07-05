@@ -99,6 +99,18 @@ export function LoginPage() {
     }
   };
 
+  const startEntraLogin = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await authApi.entraStart();
+      window.location.href = res.data.auth_url;
+    } catch (err) {
+      setError(err.response?.data?.detail || "Microsoft Entra SSO is not configured.");
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -252,6 +264,26 @@ export function LoginPage() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
+
+        <button
+          type="button"
+          onClick={startEntraLogin}
+          disabled={loading}
+          style={{
+            width: "100%",
+            marginTop: "12px",
+            padding: "12px",
+            background: "#ffffff",
+            color: "#1a3c5e",
+            border: "1px solid #cfd7df",
+            borderRadius: "6px",
+            fontSize: "15px",
+            fontWeight: 700,
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          Sign in with Microsoft Entra
+        </button>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
           <Link

@@ -11,6 +11,8 @@ export const authApi = {
 
   login: (data) => apiClient.post("/auth/login", data),
 
+  entraStart: () => apiClient.get("/auth/sso/entra/start"),
+
   logout: () => apiClient.post("/auth/logout"),
 
   forgotPassword: (email) => apiClient.post("/auth/forgot-password", { email }),

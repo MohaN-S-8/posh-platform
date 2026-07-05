@@ -185,6 +185,43 @@ class AuthService:
         )
         db.add(attempt)
 
+    async def issue_session_for_user(
+        self, db: AsyncSession, user: UserMaster, ip_address: str
+    ) -> dict:
+        if user.status != "Active" or user.is_deleted != "N":
+            await self._log_attempt(db, user.user_id, user.email, ip_address, False)
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is inactive. Contact your administrator.",
+            )
+
+        access_token = create_access_token(
+            {
+                "user_id": user.user_id,
+                "company_id": user.company_id,
+                "role_id": user.role_id,
+            }
+        )
+        raw_refresh, hashed_refresh = create_refresh_token()
+        db.add(
+            RefreshTokens(
+                user_id=user.user_id,
+                token_hash=hashed_refresh,
+                ip_address=ip_address,
+                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+            )
+        )
+        await self._log_attempt(db, user.user_id, user.email, ip_address, True)
+        await db.commit()
+        return {
+            "access_token": access_token,
+            "refresh_token": raw_refresh,
+            "user_id": user.user_id,
+            "role_id": user.role_id,
+            "company_id": user.company_id,
+        }
+
     async def _increment_lockout(self, db, user_id, lockout):
         if not lockout:
             lockout = AccountLockout(user_id=user_id, failed_attempts=0)

@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, Request, Response
+from urllib.parse import urlencode
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from jose import jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
+from app.models.user import UserMaster
 from app.schemas.auth import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
@@ -60,6 +66,79 @@ async def login(
     result = await auth_service.login(db, data, ip)
     _set_refresh_cookie(response, result["refresh_token"])
     return result
+
+
+@router.get("/sso/entra/start")
+async def entra_sso_start():
+    """Return Microsoft Entra login URL when SSO env vars are configured."""
+    if not settings.ENTRA_TENANT_ID or not settings.ENTRA_CLIENT_ID:
+        raise HTTPException(400, "Microsoft Entra SSO is not configured.")
+    params = urlencode(
+        {
+            "client_id": settings.ENTRA_CLIENT_ID,
+            "response_type": "code",
+            "redirect_uri": settings.ENTRA_REDIRECT_URI,
+            "response_mode": "query",
+            "scope": "openid profile email User.Read",
+            "state": "posh-entra",
+        }
+    )
+    return {
+        "auth_url": (
+            f"https://login.microsoftonline.com/{settings.ENTRA_TENANT_ID}"
+            f"/oauth2/v2.0/authorize?{params}"
+        )
+    }
+
+
+@router.get("/sso/entra/callback")
+async def entra_sso_callback(
+    request: Request,
+    response: Response,
+    code: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Complete Entra SSO and issue platform JWTs for an existing active user."""
+    if (
+        not settings.ENTRA_TENANT_ID
+        or not settings.ENTRA_CLIENT_ID
+        or not settings.ENTRA_CLIENT_SECRET
+    ):
+        raise HTTPException(400, "Microsoft Entra SSO is not configured.")
+
+    token_url = f"https://login.microsoftonline.com/{settings.ENTRA_TENANT_ID}" "/oauth2/v2.0/token"
+    async with httpx.AsyncClient(timeout=15) as client:
+        token_res = await client.post(
+            token_url,
+            data={
+                "client_id": settings.ENTRA_CLIENT_ID,
+                "client_secret": settings.ENTRA_CLIENT_SECRET,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.ENTRA_REDIRECT_URI,
+            },
+        )
+    if token_res.status_code >= 400:
+        raise HTTPException(401, "Unable to verify Microsoft Entra login.")
+
+    id_token = token_res.json().get("id_token")
+    if not id_token:
+        raise HTTPException(401, "Microsoft Entra did not return an ID token.")
+    claims = jwt.get_unverified_claims(id_token)
+    email = (claims.get("preferred_username") or claims.get("email") or "").lower()
+    if not email:
+        raise HTTPException(401, "Microsoft Entra account has no email claim.")
+
+    result = await db.execute(select(UserMaster).where(UserMaster.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(403, "No active POSH user is linked to this Entra account.")
+
+    session = await auth_service.issue_session_for_user(
+        db, user, request.client.host if request.client else ""
+    )
+    _set_refresh_cookie(response, session["refresh_token"])
+    return session
 
 
 @router.post("/logout")
