@@ -14,8 +14,34 @@ export function AdminAuditLogPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await apiClient.get("/admin/audit-logins");
-        setLogs(res.data || []);
+        const [actionRes, loginRes] = await Promise.all([
+          apiClient.get("/admin/audit-logs"),
+          apiClient.get("/admin/audit-logins"),
+        ]);
+        const actionLogs = (actionRes.data || []).map((log) => ({
+          ...log,
+          rowId: `action-${log.id}`,
+          type: "Action",
+          email: log.email || "-",
+          successLabel: "-",
+          timestamp: log.created_at,
+        }));
+        const loginLogs = (loginRes.data || []).map((log) => ({
+          ...log,
+          rowId: `login-${log.id}`,
+          type: "Login",
+          email: log.email_attempted,
+          action: "LOGIN_ATTEMPT",
+          table_name: "login_attempts",
+          record_id: log.id,
+          successLabel: log.success ? "Success" : "Failed",
+          timestamp: log.attempted_at,
+        }));
+        setLogs(
+          [...actionLogs, ...loginLogs].sort(
+            (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0),
+          ),
+        );
       } catch (err) {
         setError(err.response?.data?.detail || "Unable to load audit logs.");
       } finally {
@@ -34,7 +60,7 @@ export function AdminAuditLogPage() {
         Audit Logs
       </h1>
       <p style={{ color: "#64748b", margin: "0 0 24px" }}>
-        Recent login attempts captured with user, email, IP, status, and timestamp.
+        Recent login attempts and admin/HR actions captured with user, IP, target, and timestamp.
       </p>
 
       {error && <div style={errorStyle}>{error}</div>}
@@ -43,7 +69,7 @@ export function AdminAuditLogPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "760px" }}>
           <thead>
             <tr style={{ background: "#17324d", color: "white" }}>
-              {["Email", "User ID", "IP Address", "Success", "Timestamp"].map((heading) => (
+              {["Type", "Action", "Email", "User ID", "Target", "IP Address", "Result", "Timestamp"].map((heading) => (
                 <th key={heading} style={thStyle}>
                   {heading}
                 </th>
@@ -53,21 +79,27 @@ export function AdminAuditLogPage() {
           <tbody>
             {logs.length ? (
               logs.map((log) => (
-                <tr key={log.id} style={{ borderBottom: "1px solid #eef2f6" }}>
-                  <td style={tdStyle}>{log.email_attempted}</td>
+                <tr key={log.rowId} style={{ borderBottom: "1px solid #eef2f6" }}>
+                  <td style={tdStyle}>{log.type}</td>
+                  <td style={{ ...tdStyle, color: "#17324d", fontWeight: 700 }}>{log.action}</td>
+                  <td style={tdStyle}>{log.email}</td>
                   <td style={tdStyle}>{log.user_id || "-"}</td>
+                  <td style={tdStyle}>
+                    {log.table_name || "-"}
+                    {log.record_id ? ` #${log.record_id}` : ""}
+                  </td>
                   <td style={tdStyle}>{log.ip_address || "-"}</td>
-                  <td style={{ ...tdStyle, color: log.success ? "#1f7a4d" : "#c0392b" }}>
-                    {log.success ? "Success" : "Failed"}
+                  <td style={{ ...tdStyle, color: log.success === false ? "#c0392b" : "#1f7a4d" }}>
+                    {log.successLabel}
                   </td>
                   <td style={tdStyle}>
-                    {log.attempted_at ? new Date(log.attempted_at).toLocaleString() : "-"}
+                    {log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"}
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} style={{ padding: "28px", color: "#64748b" }}>
+                <td colSpan={8} style={{ padding: "28px", color: "#64748b" }}>
                   No audit log entries found.
                 </td>
               </tr>
@@ -76,7 +108,7 @@ export function AdminAuditLogPage() {
         </table>
       </div>
 
-      <LoadingOverlay show={loading} title="Loading audit logs" message="Fetching login events." />
+      <LoadingOverlay show={loading} title="Loading audit logs" message="Fetching login and action events." />
     </div>
   );
 }

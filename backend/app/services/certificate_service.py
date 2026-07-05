@@ -9,7 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,6 +75,19 @@ class CertificateService:
         if existing:
             return existing
 
+        template_result = await db.execute(
+            select(CertificateTemplate)
+            .where(
+                CertificateTemplate.company_id == company_id,
+                CertificateTemplate.status == "Active",
+            )
+            .order_by(
+                CertificateTemplate.updated_date.desc(), CertificateTemplate.template_id.desc()
+            )
+            .limit(1)
+        )
+        template = template_result.scalar_one_or_none()
+
         # 2. Generate unique certificate number
         year = datetime.now().year
         cert_number = f"POSH-{year}-{uuid.uuid4().hex[:10].upper()}"
@@ -93,6 +106,7 @@ class CertificateService:
             course_name=video.title,
             cert_number=cert_number,
             completion_date=date.today(),
+            template=template,
         )
         pdf_path = f"certificates/{company_id}/pdf/{cert_number}.pdf"
         upload_file(pdf_bytes, CERT_BUCKET, pdf_path, "application/pdf")
@@ -102,6 +116,7 @@ class CertificateService:
             user_id=user_id,
             video_id=video_id,
             company_id=company_id,
+            template_id=template.template_id if template else None,
             certificate_number=cert_number,
             course_name=video.title,
             completion_date=date.today(),
@@ -151,6 +166,7 @@ class CertificateService:
         course_name: str,
         cert_number: str,
         completion_date: date,
+        template: Optional[CertificateTemplate] = None,
     ) -> bytes:
         """Generate certificate PDF using ReportLab."""
         buf = io.BytesIO()
@@ -170,27 +186,31 @@ class CertificateService:
         from reportlab.lib.enums import TA_CENTER
         from reportlab.lib.styles import ParagraphStyle
 
+        brand_color = template.color_code if template else "#1a3c5e"
+        font_name = template.font_name if template else "Helvetica"
+        title_font = "Helvetica-Bold" if font_name == "Helvetica" else font_name
+
         title_style = ParagraphStyle(
             "Title",
             fontSize=28,
-            textColor=colors.HexColor("#1a3c5e"),
+            textColor=colors.HexColor(brand_color),
             alignment=TA_CENTER,
-            fontName="Helvetica-Bold",
+            fontName=title_font,
             spaceAfter=20,
         )
         body_style = ParagraphStyle(
             "Body",
             fontSize=14,
             alignment=TA_CENTER,
-            fontName="Helvetica",
+            fontName=font_name,
             spaceAfter=12,
         )
         name_style = ParagraphStyle(
             "Name",
             fontSize=22,
-            textColor=colors.HexColor("#1a3c5e"),
+            textColor=colors.HexColor(brand_color),
             alignment=TA_CENTER,
-            fontName="Helvetica-Bold",
+            fontName=title_font,
             spaceAfter=16,
         )
         small_style = ParagraphStyle(
@@ -198,10 +218,22 @@ class CertificateService:
             fontSize=10,
             alignment=TA_CENTER,
             textColor=colors.grey,
-            fontName="Helvetica",
+            fontName=font_name,
         )
 
         story.append(Spacer(1, 1 * cm))
+        if template and template.logo_path:
+            try:
+                story.append(
+                    Image(
+                        generate_presigned_url(CERT_BUCKET, template.logo_path, 300),
+                        width=3 * cm,
+                        height=2 * cm,
+                    )
+                )
+                story.append(Spacer(1, 0.3 * cm))
+            except Exception:
+                pass
         story.append(Paragraph("Certificate of Completion", title_style))
         story.append(Paragraph("This is to certify that", body_style))
         story.append(Paragraph(employee_name, name_style))
@@ -215,6 +247,18 @@ class CertificateService:
             )
         )
         story.append(Spacer(1, 1 * cm))
+        if template and template.signature_path:
+            try:
+                story.append(
+                    Image(
+                        generate_presigned_url(CERT_BUCKET, template.signature_path, 300),
+                        width=4 * cm,
+                        height=1.5 * cm,
+                    )
+                )
+                story.append(Spacer(1, 0.2 * cm))
+            except Exception:
+                pass
         story.append(Paragraph(f"Certificate Number: {cert_number}", small_style))
         story.append(
             Paragraph(
@@ -355,3 +399,33 @@ class CertificateService:
         template.status = new_status
         await db.commit()
         return {"message": f"Template {new_status.lower()} successfully."}
+
+    async def upload_template_asset(
+        self, db, template_id: int, company_id: int, file, asset_type: str
+    ) -> CertificateTemplate:
+        if asset_type not in ["logo", "signature"]:
+            raise HTTPException(400, "asset_type must be logo or signature.")
+        result = await db.execute(
+            select(CertificateTemplate).where(
+                CertificateTemplate.template_id == template_id,
+                CertificateTemplate.company_id == company_id,
+            )
+        )
+        template = result.scalar_one_or_none()
+        if not template:
+            raise HTTPException(404, "Certificate template not found.")
+
+        file_bytes = await file.read()
+        extension = (file.filename or f"{asset_type}.png").split(".")[-1].lower()
+        object_key = f"certificate-templates/{company_id}/{template_id}/{asset_type}.{extension}"
+        upload_file(
+            file_bytes, CERT_BUCKET, object_key, file.content_type or "application/octet-stream"
+        )
+
+        if asset_type == "logo":
+            template.logo_path = object_key
+        else:
+            template.signature_path = object_key
+        await db.commit()
+        await db.refresh(template)
+        return template

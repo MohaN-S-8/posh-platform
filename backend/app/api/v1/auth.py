@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     OTPVerifyRequest,
@@ -94,3 +95,15 @@ async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depend
 async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Reset password using token from email."""
     return await auth_service.reset_password(db, data.token, data.new_password)
+
+
+@router.post("/change-password")
+async def change_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Authenticated user changes their own password."""
+    return await auth_service.change_password(
+        db, current_user.user_id, data.current_password, data.new_password
+    )

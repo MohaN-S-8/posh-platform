@@ -124,6 +124,24 @@ class ResetPasswordRequest(BaseModel):
     confirm_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        return SignupRequest.validate_password(v)
+
+    @field_validator("confirm_password")
+    @classmethod
+    def validate_confirm_password(cls, v, info):
+        if "new_password" in info.data and v != info.data["new_password"]:
+            raise ValueError("Passwords do not match")
+        return v
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

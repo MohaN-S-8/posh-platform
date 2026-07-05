@@ -59,12 +59,14 @@ export function VideoPlayerPage() {
   const [isBuffering, setIsBuffering] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
+  const [selectedQuality, setSelectedQuality] = useState("");
 
   useEffect(() => {
     apiClient
       .get(`/videos/${videoId}/stream-url`)
       .then((res) => {
         setStream(res.data);
+        setSelectedQuality(res.data.qualities?.[0]?.label || "source");
         setCompletion(res.data.completion_percent || 0);
         setUnlocked((res.data.completion_percent || 0) >= 95);
         maxWatched.current = Math.max(
@@ -247,6 +249,27 @@ export function VideoPlayerPage() {
     }
   };
 
+  const changeQuality = (event) => {
+    const nextQuality = event.target.value;
+    const selected = stream?.qualities?.find((quality) => quality.label === nextQuality);
+    const video = videoRef.current;
+    if (!selected || !video) return;
+    const resumeAt = video.currentTime;
+    const wasPlaying = !video.paused;
+    setSelectedQuality(nextQuality);
+    setStream((current) => ({ ...current, stream_url: selected.stream_url }));
+    window.setTimeout(() => {
+      const nextVideo = videoRef.current;
+      if (!nextVideo) return;
+      internalSeek.current = true;
+      nextVideo.currentTime = Math.min(resumeAt, maxWatched.current);
+      window.setTimeout(() => {
+        internalSeek.current = false;
+        if (wasPlaying) playVideo();
+      }, 150);
+    }, 100);
+  };
+
   const onEnded = () => {
     const video = videoRef.current;
     setIsPlaying(false);
@@ -296,7 +319,7 @@ export function VideoPlayerPage() {
             background: "#111827",
             borderRadius: "8px",
             overflow: "hidden",
-            minHeight: "320px",
+            minHeight: "clamp(220px, 52vh, 620px)",
             position: "relative",
           }}
         >
@@ -340,16 +363,29 @@ export function VideoPlayerPage() {
                   setIsBuffering(false);
                 }}
                 onClick={isPlaying ? pauseVideo : playVideo}
-                style={{ width: "100%", maxHeight: "70vh", display: "block" }}
+                style={{
+                  width: "100%",
+                  height: "clamp(220px, 52vh, 620px)",
+                  maxHeight: "100vh",
+                  display: "block",
+                  objectFit: "contain",
+                  background: "#111827",
+                }}
               >
                 <source src={stream.stream_url} type="video/mp4" />
-                <track
-                  kind="subtitles"
-                  src="data:text/vtt,WEBVTT%0A%0A"
-                  srcLang="en"
-                  label="English"
-                  default
-                />
+                {(stream.subtitles?.length
+                  ? stream.subtitles
+                  : [{ language_name: "English", subtitle_url: "data:text/vtt,WEBVTT%0A%0A" }]
+                ).map((subtitle, index) => (
+                  <track
+                    key={`${subtitle.language_name}-${index}`}
+                    kind="subtitles"
+                    src={subtitle.subtitle_url}
+                    srcLang={subtitle.language_name?.toLowerCase().slice(0, 2) || "en"}
+                    label={subtitle.language_name}
+                    default={index === 0}
+                  />
+                ))}
               </video>
               {isBuffering && (
                 <div
@@ -492,11 +528,27 @@ export function VideoPlayerPage() {
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               <select style={selectStyle} value="en" onChange={() => {}} aria-label="Subtitle language">
-                <option value="en">English</option>
+                {(stream?.subtitles?.length ? stream.subtitles : [{ language_name: "English" }]).map(
+                  (subtitle) => (
+                    <option key={subtitle.language_name} value={subtitle.language_name}>
+                      {subtitle.language_name}
+                    </option>
+                  ),
+                )}
               </select>
-              <select style={selectStyle} value="auto" onChange={() => {}} aria-label="Video quality">
-                <option value="auto">Auto quality</option>
-                <option value="source">Source quality</option>
+              <select
+                style={selectStyle}
+                value={selectedQuality}
+                onChange={changeQuality}
+                aria-label="Video quality"
+              >
+                {(stream?.qualities?.length ? stream.qualities : [{ label: "source" }]).map(
+                  (quality) => (
+                    <option key={quality.label} value={quality.label}>
+                      {quality.label}
+                    </option>
+                  ),
+                )}
               </select>
             </div>
           </div>

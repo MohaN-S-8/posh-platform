@@ -10,6 +10,7 @@ import { OTPPage } from "./features/auth/OTPPage";
 import { ForgotPasswordPage } from "./features/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./features/auth/ResetPasswordPage";
 import { UnauthorizedPage } from "./features/auth/UnauthorizedPage";
+import { ChangePasswordPage } from "./features/auth/ChangePasswordPage";
 
 // Admin portal
 import { AdminDashboard } from "./features/admin/AdminDashboard";
@@ -48,6 +49,14 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Admin portal — role 1 or 2 only */}
         <Route

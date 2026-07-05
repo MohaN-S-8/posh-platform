@@ -2,8 +2,6 @@ import AssessmentIcon from "@mui/icons-material/Assessment";
 import BadgeIcon from "@mui/icons-material/Badge";
 import HistoryIcon from "@mui/icons-material/History";
 import LogoutIcon from "@mui/icons-material/Logout";
-import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import PersonIcon from "@mui/icons-material/Person";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { useEffect, useMemo, useState } from "react";
@@ -150,20 +148,6 @@ export function EmployeeDashboard() {
       icon: <HistoryIcon />,
       status: "Available",
     },
-    {
-      title: "Notifications",
-      description: "Reminder and email-copy features are planned.",
-      path: null,
-      icon: <NotificationsActiveIcon />,
-      status: "Planned",
-    },
-    {
-      title: "Profile Settings",
-      description: "Language preference and profile settings are planned.",
-      path: null,
-      icon: <PersonIcon />,
-      status: "Planned",
-    },
   ];
 
   return (
@@ -186,25 +170,42 @@ export function EmployeeDashboard() {
             Complete assigned POSH training, assessments, certificates, and history.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={logout}
-          style={{
-            padding: "10px 16px",
-            background: "#c0392b",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            fontWeight: 700,
-          }}
-        >
-          <LogoutIcon fontSize="small" />
-          Logout
-        </button>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => navigate("/change-password")}
+            style={{
+              padding: "10px 16px",
+              background: "#eef4f8",
+              color: "#17324d",
+              border: "1px solid #cdd9e2",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Change Password
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            style={{
+              padding: "10px 16px",
+              background: "#c0392b",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              fontWeight: 700,
+            }}
+          >
+            <LogoutIcon fontSize="small" />
+            Logout
+          </button>
+        </div>
       </div>
 
       {error && (

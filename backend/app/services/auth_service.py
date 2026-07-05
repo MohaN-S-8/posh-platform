@@ -340,3 +340,16 @@ class AuthService:
         await db.commit()
 
         return {"message": "Password reset successfully. You can now log in."}
+
+    async def change_password(
+        self, db: AsyncSession, user_id: int, current_password: str, new_password: str
+    ) -> dict:
+        result = await db.execute(select(UserMaster).where(UserMaster.user_id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if not verify_password(current_password, user.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+        user.password_hash = hash_password(new_password)
+        await db.commit()
+        return {"message": "Password changed successfully."}

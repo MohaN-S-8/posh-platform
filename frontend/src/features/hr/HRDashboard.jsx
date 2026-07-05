@@ -45,11 +45,27 @@ export function HRDashboard() {
   const { clearAuth, user } = useAuthStore();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reminding, setReminding] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const logout = async () => {
     await clearAuth();
     navigate("/login");
+  };
+
+  const sendReminders = async () => {
+    setReminding(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await apiClient.post("/hr/notifications/send-reminders");
+      setMessage(res.data?.message || "Training reminders created.");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to create training reminders.");
+    } finally {
+      setReminding(false);
+    }
   };
 
   useEffect(() => {
@@ -118,26 +134,23 @@ export function HRDashboard() {
       icon: <DownloadIcon />,
       status: "Available",
     },
-    {
-      title: "Employee Management",
-      description: "Activate, deactivate, and update employees from Admin Users.",
-      path: user?.role_id === 1 || user?.role_id === 2 ? "/admin/users" : null,
-      icon: <GroupsIcon />,
-      status: user?.role_id === 1 || user?.role_id === 2 ? "Shared" : "Planned",
-    },
+    ...(user?.role_id === 1 || user?.role_id === 2
+      ? [
+          {
+            title: "Employee Management",
+            description: "Activate, deactivate, and update employees from Admin Users.",
+            path: "/admin/users",
+            icon: <GroupsIcon />,
+            status: "Shared",
+          },
+        ]
+      : []),
     {
       title: "Certificate Downloads",
       description: "Certificate reports are available; per-certificate downloads are employee-side.",
       path: "/hr/reports",
       icon: <BadgeIcon />,
       status: "Partial",
-    },
-    {
-      title: "Notifications",
-      description: "Reminder emails and automatic notifications are planned.",
-      path: null,
-      icon: <NotificationsActiveIcon />,
-      status: "Planned",
     },
   ];
 
@@ -161,25 +174,42 @@ export function HRDashboard() {
             Manage employee training, assignments, compliance, reports, and certificates.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={logout}
-          style={{
-            padding: "10px 16px",
-            background: "#c0392b",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            fontWeight: 700,
-          }}
-        >
-          <LogoutIcon fontSize="small" />
-          Logout
-        </button>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => navigate("/change-password")}
+            style={{
+              padding: "10px 16px",
+              background: "#eef4f8",
+              color: "#17324d",
+              border: "1px solid #cdd9e2",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Change Password
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            style={{
+              padding: "10px 16px",
+              background: "#c0392b",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              fontWeight: 700,
+            }}
+          >
+            <LogoutIcon fontSize="small" />
+            Logout
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -193,6 +223,20 @@ export function HRDashboard() {
           }}
         >
           {error}
+        </div>
+      )}
+
+      {message && (
+        <div
+          style={{
+            ...cardStyle,
+            borderColor: "#b7dfc2",
+            background: "#f1fbf4",
+            color: "#1f7a4d",
+            marginBottom: "20px",
+          }}
+        >
+          {message}
         </div>
       )}
 
@@ -303,6 +347,27 @@ export function HRDashboard() {
             >
               Review Compliance
             </button>
+            <button
+              type="button"
+              onClick={sendReminders}
+              disabled={reminding}
+              style={{
+                padding: "9px 12px",
+                background: reminding ? "#93a4b7" : "#1f7a4d",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: reminding ? "not-allowed" : "pointer",
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
+              <NotificationsActiveIcon fontSize="small" />
+              {reminding ? "Creating reminders..." : "Send Reminders"}
+            </button>
           </div>
         </div>
       </section>
@@ -368,9 +433,13 @@ export function HRDashboard() {
       </section>
 
       <LoadingOverlay
-        show={loading}
-        title="Loading HR dashboard"
-        message="Fetching employees, compliance, overdue training, and department status."
+        show={loading || reminding}
+        title={reminding ? "Creating reminders" : "Loading HR dashboard"}
+        message={
+          reminding
+            ? "Creating employee notifications for due and overdue training."
+            : "Fetching employees, compliance, overdue training, and department status."
+        }
       />
     </div>
   );

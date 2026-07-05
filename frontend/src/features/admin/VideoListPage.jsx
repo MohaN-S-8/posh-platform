@@ -19,6 +19,8 @@ export function VideoListPage() {
     description: "",
     category_id: "",
     duration_minutes: "",
+    quality_label: "720p",
+    transcript_text: "",
   });
 
   const fetchVideos = async ({ showLoading = true } = {}) => {
@@ -65,6 +67,10 @@ export function VideoListPage() {
     if (form.duration_minutes) {
       formData.append("duration_minutes", form.duration_minutes);
     }
+    formData.append("quality_label", form.quality_label);
+    if (form.transcript_text) {
+      formData.append("transcript_text", form.transcript_text);
+    }
 
     try {
       const res = await apiClient.post("/videos/upload", formData, {
@@ -83,6 +89,8 @@ export function VideoListPage() {
         description: "",
         category_id: "",
         duration_minutes: "",
+        quality_label: "720p",
+        transcript_text: "",
       });
       fileInputRef.current.value = "";
       await fetchVideos();
@@ -209,6 +217,20 @@ export function VideoListPage() {
                 style={inputStyle}
               />
             </div>
+            <div>
+              <label style={labelStyle}>Quality *</label>
+              <select
+                value={form.quality_label}
+                onChange={(e) => setForm({ ...form, quality_label: e.target.value })}
+                style={inputStyle}
+              >
+                {["360p", "480p", "720p", "1080p"].map((quality) => (
+                  <option key={quality} value={quality}>
+                    {quality}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div style={{ marginBottom: "16px" }}>
             <label style={labelStyle}>Description</label>
@@ -216,6 +238,16 @@ export function VideoListPage() {
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+          </div>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>Transcript / Subtitle Text</label>
+            <textarea
+              value={form.transcript_text}
+              onChange={(e) => setForm({ ...form, transcript_text: e.target.value })}
+              rows={4}
+              placeholder="Paste WEBVTT content or plain transcript text."
               style={{ ...inputStyle, resize: "vertical" }}
             />
           </div>

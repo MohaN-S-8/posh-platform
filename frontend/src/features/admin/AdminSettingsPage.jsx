@@ -3,13 +3,15 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 
-const plannedItems = [
-  "Full RBAC permission tables: permission_master and role_permission.",
-  "Company language preference table and company-level defaults.",
-  "SSO and Entra ID login flow.",
-  "Automatic transcript generation from uploaded videos.",
-  "Automatic assessment-question generation from transcripts.",
-  "Multi-quality transcoding for 360p, 480p, 720p, and 1080p playback.",
+const implementedItems = [
+  "Management APIs enforce permission_master and role_permission checks.",
+  "company_languages table is created and seeded for the default company.",
+  "Audit Logs shows login attempts and sensitive admin/HR action logging.",
+  "Employee, department, and certificate reports export as Excel, CSV, and PDF.",
+  "HR can create due and overdue training reminder notifications.",
+  "video_quality table stores uploaded quality variants.",
+  "Video transcript text is stored as English WebVTT subtitles.",
+  "Certificate templates support color, font, logo, and signature assets.",
 ];
 
 export function AdminSettingsPage() {
@@ -43,7 +45,7 @@ export function AdminSettingsPage() {
         System Settings
       </h1>
       <p style={{ color: "#64748b", margin: "0 0 24px" }}>
-        Current platform configuration and remaining implementation items.
+        Current platform configuration.
       </p>
 
       {error && <div style={errorStyle}>{error}</div>}
@@ -70,9 +72,9 @@ export function AdminSettingsPage() {
       </section>
 
       <section style={cardStyle}>
-        <h2 style={headingStyle}>Backend Work Still Needed</h2>
+        <h2 style={headingStyle}>Implemented Platform Configuration</h2>
         <div style={{ display: "grid", gap: "10px" }}>
-          {plannedItems.map((item) => (
+          {implementedItems.map((item) => (
             <div key={item} style={{ color: "#64748b", fontSize: "14px" }}>
               {item}
             </div>

@@ -1,6 +1,6 @@
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
@@ -86,6 +86,39 @@ def require_roles(role_ids: list[int]):
 
     async def checker(current_user: CurrentUser = Depends(get_current_user)):
         if current_user.role_id not in role_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this resource.",
+            )
+        return current_user
+
+    return checker
+
+
+def require_permission(permission_key: str):
+    """Restrict endpoint access using role_permission instead of role ids."""
+
+    async def checker(
+        current_user: CurrentUser = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ):
+        if current_user.role_id == 1:
+            return current_user
+
+        result = await db.execute(
+            text(
+                """
+                SELECT 1
+                FROM role_permission rp
+                JOIN permission_master pm ON pm.permission_id = rp.permission_id
+                WHERE rp.role_id = :role_id
+                  AND pm.permission_key = :permission_key
+                LIMIT 1
+                """
+            ),
+            {"role_id": current_user.role_id, "permission_key": permission_key},
+        )
+        if not result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to access this resource.",

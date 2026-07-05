@@ -13,6 +13,7 @@ from app.api.v1.certificates import router as certificates_router
 from app.api.v1.company import router as company_router
 from app.api.v1.employee import router as employee_router
 from app.api.v1.hr import router as hr_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.users import router as users_router
 from app.api.v1.videos import router as videos_router
 from app.core.config import settings
@@ -41,6 +42,7 @@ app.include_router(certificates_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(employee_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
@@ -55,6 +57,78 @@ async def run_seed_on_startup():
     from app.db.session import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS permission_master (
+                    permission_id INT AUTO_INCREMENT PRIMARY KEY,
+                    permission_key VARCHAR(100) UNIQUE NOT NULL,
+                    permission_name VARCHAR(150) NOT NULL,
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS role_permission (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    role_id INT NOT NULL,
+                    permission_id INT NOT NULL,
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_role_permission (role_id, permission_id)
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS company_languages (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    company_id INT NOT NULL,
+                    language_id INT NOT NULL,
+                    is_default BOOLEAN DEFAULT FALSE,
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_company_language (company_id, language_id)
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NULL,
+                    company_id INT NULL,
+                    action VARCHAR(120) NOT NULL,
+                    table_name VARCHAR(120) NULL,
+                    record_id VARCHAR(100) NULL,
+                    ip_address VARCHAR(45) NULL,
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS video_quality (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    video_id INT NOT NULL,
+                    company_id INT NOT NULL,
+                    quality_label VARCHAR(20) NOT NULL,
+                    video_path VARCHAR(500) NOT NULL,
+                    mime_type VARCHAR(100),
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_video_quality (video_id, quality_label)
+                )
+                """
+            )
+        )
+
         await db.execute(
             text(
                 """
@@ -189,6 +263,49 @@ async def run_seed_on_startup():
                     FROM user_master
                     WHERE email IN ('admin@posh.com', 'hr@posh.com')
                 )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                INSERT INTO permission_master (permission_key, permission_name)
+                VALUES
+                    ('users.manage', 'Manage Users'),
+                    ('videos.manage', 'Manage Videos'),
+                    ('certificates.manage', 'Manage Certificates'),
+                    ('reports.view', 'View Reports'),
+                    ('training.assign', 'Assign Training'),
+                    ('courses.watch', 'Watch Courses')
+                ON DUPLICATE KEY UPDATE permission_name = VALUES(permission_name)
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                INSERT IGNORE INTO role_permission (role_id, permission_id)
+                SELECT 1, permission_id FROM permission_master
+                UNION SELECT 2, permission_id FROM permission_master
+                WHERE permission_key IN ('users.manage','videos.manage','certificates.manage','reports.view','training.assign')
+                UNION SELECT 3, permission_id FROM permission_master
+                WHERE permission_key IN ('reports.view','training.assign')
+                UNION SELECT 4, permission_id FROM permission_master
+                WHERE permission_key IN ('courses.watch')
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                INSERT IGNORE INTO company_languages (company_id, language_id, is_default)
+                VALUES
+                    (1, 1, TRUE),
+                    (1, 2, FALSE),
+                    (1, 3, FALSE),
+                    (1, 4, FALSE),
+                    (1, 5, FALSE),
+                    (1, 6, FALSE)
                 """
             )
         )

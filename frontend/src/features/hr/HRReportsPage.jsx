@@ -1,6 +1,5 @@
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import BadgeIcon from "@mui/icons-material/Badge";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import DownloadIcon from "@mui/icons-material/Download";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { useState } from "react";
@@ -16,6 +15,25 @@ const reports = [
     fileName: "employee_training_report.xlsx",
     icon: <GroupsIcon />,
     status: "Available",
+    format: "Excel",
+  },
+  {
+    title: "Employee Report CSV",
+    description: "Employee-wise status and completion data in CSV format.",
+    endpoint: "/hr/reports/employees.csv",
+    fileName: "employee_training_report.csv",
+    icon: <GroupsIcon />,
+    status: "Available",
+    format: "CSV",
+  },
+  {
+    title: "Employee Report PDF",
+    description: "Printable employee-wise training status report.",
+    endpoint: "/hr/reports/employees.pdf",
+    fileName: "employee_training_report.pdf",
+    icon: <GroupsIcon />,
+    status: "Available",
+    format: "PDF",
   },
   {
     title: "Department Report",
@@ -24,6 +42,25 @@ const reports = [
     fileName: "department_compliance_report.xlsx",
     icon: <AssessmentIcon />,
     status: "Available",
+    format: "Excel",
+  },
+  {
+    title: "Department Report CSV",
+    description: "Department compliance data in CSV format.",
+    endpoint: "/hr/reports/departments.csv",
+    fileName: "department_compliance_report.csv",
+    icon: <AssessmentIcon />,
+    status: "Available",
+    format: "CSV",
+  },
+  {
+    title: "Department Report PDF",
+    description: "Printable department compliance report.",
+    endpoint: "/hr/reports/departments.pdf",
+    fileName: "department_compliance_report.pdf",
+    icon: <AssessmentIcon />,
+    status: "Available",
+    format: "PDF",
   },
   {
     title: "Certificate Report",
@@ -32,14 +69,25 @@ const reports = [
     fileName: "certificate_report.xlsx",
     icon: <BadgeIcon />,
     status: "Available",
+    format: "Excel",
   },
   {
-    title: "Monthly Report",
-    description: "Month-by-month compliance trends for audits and leadership reviews.",
-    endpoint: null,
-    fileName: "",
-    icon: <CalendarMonthIcon />,
-    status: "Planned",
+    title: "Certificate Report CSV",
+    description: "Issued certificate records in CSV format.",
+    endpoint: "/hr/reports/certificates.csv",
+    fileName: "certificate_report.csv",
+    icon: <BadgeIcon />,
+    status: "Available",
+    format: "CSV",
+  },
+  {
+    title: "Certificate Report PDF",
+    description: "Printable certificate issue report.",
+    endpoint: "/hr/reports/certificates.pdf",
+    fileName: "certificate_report.pdf",
+    icon: <BadgeIcon />,
+    status: "Available",
+    format: "PDF",
   },
 ];
 
@@ -176,7 +224,7 @@ export function HRReportsPage() {
                   }}
                 >
                   <DownloadIcon fontSize="small" />
-                  {downloading === report.title ? "Downloading..." : "Download Excel"}
+                  {downloading === report.title ? "Downloading..." : `Download ${report.format}`}
                 </span>
               )}
             </button>

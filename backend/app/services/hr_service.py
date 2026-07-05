@@ -4,6 +4,10 @@ from typing import Optional
 
 import pandas as pd
 from fastapi import HTTPException, UploadFile, status
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +15,7 @@ from app.core.security import hash_password
 from app.models.certificate import Certificate
 from app.models.company import CompanyMaster
 from app.models.hr import EmployeeUploadBatch
+from app.models.notification import Notification
 from app.models.training import CourseAssignment, TrainingHistory
 from app.models.user import UserMaster
 from app.models.video import VideoMaster
@@ -587,3 +592,161 @@ class HRService:
 
         output.seek(0)
         return output.read()
+
+    def _dataframe_to_csv(self, df: pd.DataFrame) -> bytes:
+        output = io.StringIO()
+        df.to_csv(output, index=False)
+        return output.getvalue().encode("utf-8")
+
+    def _dataframe_to_pdf(self, df: pd.DataFrame, title: str) -> bytes:
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=landscape(A4),
+            rightMargin=24,
+            leftMargin=24,
+            topMargin=24,
+            bottomMargin=24,
+        )
+        styles = getSampleStyleSheet()
+        story = [Paragraph(title, styles["Title"]), Spacer(1, 12)]
+
+        rows = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
+        table = Table(rows, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17324d")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d8e1ea")),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#f6f8fa")],
+                    ),
+                ]
+            )
+        )
+        story.append(table)
+        doc.build(story)
+        output.seek(0)
+        return output.read()
+
+    async def _read_excel_report(self, report_bytes: bytes) -> pd.DataFrame:
+        return pd.read_excel(io.BytesIO(report_bytes))
+
+    async def generate_employee_report_csv(self, db: AsyncSession, company_id: int) -> bytes:
+        df = await self._read_excel_report(await self.generate_employee_report(db, company_id))
+        return self._dataframe_to_csv(df)
+
+    async def generate_department_report_csv(self, db: AsyncSession, company_id: int) -> bytes:
+        df = await self._read_excel_report(await self.generate_department_report(db, company_id))
+        return self._dataframe_to_csv(df)
+
+    async def generate_certificate_report_csv(self, db: AsyncSession, company_id: int) -> bytes:
+        df = await self._read_excel_report(await self.generate_certificate_report(db, company_id))
+        return self._dataframe_to_csv(df)
+
+    async def generate_employee_report_pdf(self, db: AsyncSession, company_id: int) -> bytes:
+        df = await self._read_excel_report(await self.generate_employee_report(db, company_id))
+        return self._dataframe_to_pdf(df, "Employee Training Report")
+
+    async def generate_department_report_pdf(self, db: AsyncSession, company_id: int) -> bytes:
+        df = await self._read_excel_report(await self.generate_department_report(db, company_id))
+        return self._dataframe_to_pdf(df, "Department Compliance Report")
+
+    async def generate_certificate_report_pdf(self, db: AsyncSession, company_id: int) -> bytes:
+        df = await self._read_excel_report(await self.generate_certificate_report(db, company_id))
+        return self._dataframe_to_pdf(df, "Certificate Report")
+
+    async def create_training_reminders(
+        self,
+        db: AsyncSession,
+        company_id: int,
+        created_by: int,
+    ) -> dict:
+        """Create notifications for due or overdue assigned courses."""
+        now = datetime.now(timezone.utc)
+        reminder_until = now + timedelta(days=7)
+        result = await db.execute(
+            select(
+                UserMaster.user_id,
+                UserMaster.first_name,
+                UserMaster.email,
+                VideoMaster.title,
+                CourseAssignment.due_date,
+            )
+            .join(
+                CourseAssignment,
+                and_(
+                    CourseAssignment.company_id == company_id,
+                    or_(
+                        CourseAssignment.assigned_to_user_id == UserMaster.user_id,
+                        and_(
+                            CourseAssignment.assign_type == "Department",
+                            CourseAssignment.assigned_to_department == UserMaster.department,
+                        ),
+                        CourseAssignment.assign_type == "Company-Wide",
+                    ),
+                ),
+            )
+            .join(VideoMaster, VideoMaster.video_id == CourseAssignment.video_id)
+            .outerjoin(
+                TrainingHistory,
+                and_(
+                    TrainingHistory.user_id == UserMaster.user_id,
+                    TrainingHistory.video_id == CourseAssignment.video_id,
+                    TrainingHistory.company_id == company_id,
+                    TrainingHistory.status == "Completed",
+                ),
+            )
+            .where(
+                UserMaster.company_id == company_id,
+                UserMaster.status == "Active",
+                UserMaster.is_deleted == "N",
+                UserMaster.role_id == 4,
+                CourseAssignment.due_date <= reminder_until,
+                TrainingHistory.id.is_(None),
+            )
+            .distinct()
+        )
+
+        created = 0
+        skipped = 0
+        for row in result:
+            due_text = row.due_date.strftime("%Y-%m-%d") if row.due_date else "soon"
+            title = "Training reminder"
+            message = f"{row.title} is due by {due_text}. Please complete your POSH training."
+            existing = await db.execute(
+                select(Notification.id).where(
+                    Notification.user_id == row.user_id,
+                    Notification.company_id == company_id,
+                    Notification.title == title,
+                    Notification.message == message,
+                )
+            )
+            if existing.scalar_one_or_none():
+                skipped += 1
+                continue
+
+            db.add(
+                Notification(
+                    user_id=row.user_id,
+                    company_id=company_id,
+                    title=title,
+                    message=message,
+                )
+            )
+            created += 1
+
+        await db.commit()
+        return {
+            "message": f"{created} reminders created.",
+            "created": created,
+            "skipped_existing": skipped,
+            "triggered_by": created_by,
+        }

@@ -4,7 +4,7 @@ from typing import Optional
 
 import magic  # python-magic for real MIME type detection
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import generate_presigned_url, upload_file
@@ -28,6 +28,8 @@ class VideoService:
         metadata: VideoCreate,
         uploaded_by: int,
         company_id: int,
+        quality_label: str = "720p",
+        transcript_text: Optional[str] = None,
     ) -> VideoMaster:
         """Upload a video file and save metadata."""
 
@@ -72,6 +74,37 @@ class VideoService:
         db.add(video)
         await db.commit()
         await db.refresh(video)
+        await db.execute(
+            text(
+                """
+                INSERT INTO video_quality (video_id, company_id, quality_label, video_path, mime_type)
+                VALUES (:video_id, :company_id, :quality_label, :video_path, :mime_type)
+                """
+            ),
+            {
+                "video_id": video.video_id,
+                "company_id": company_id,
+                "quality_label": quality_label,
+                "video_path": object_key,
+                "mime_type": mime_type,
+            },
+        )
+        if transcript_text:
+            transcript_key = f"videos/{company_id}/transcripts/{video.video_id}-english.vtt"
+            transcript_body = transcript_text.strip()
+            if not transcript_body.startswith("WEBVTT"):
+                transcript_body = f"WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n{transcript_body}"
+            upload_file(transcript_body.encode("utf-8"), VIDEO_BUCKET, transcript_key, "text/vtt")
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO video_language (video_id, language_id, subtitle_path)
+                    VALUES (:video_id, 1, :subtitle_path)
+                    """
+                ),
+                {"video_id": video.video_id, "subtitle_path": transcript_key},
+            )
+        await db.commit()
         return video
 
     async def get_stream_url(
@@ -140,7 +173,51 @@ class VideoService:
             )
 
         # Generate signed URL (expires in 5 minutes)
-        signed_url = generate_presigned_url(VIDEO_BUCKET, video.video_url, 300)
+        quality_result = await db.execute(
+            text(
+                """
+                SELECT quality_label, video_path
+                FROM video_quality
+                WHERE video_id = :video_id AND company_id = :company_id
+                ORDER BY FIELD(quality_label, '360p', '480p', '720p', '1080p'), quality_label
+                """
+            ),
+            {"video_id": video_id, "company_id": company_id},
+        )
+        qualities = [
+            {
+                "label": row.quality_label,
+                "stream_url": generate_presigned_url(VIDEO_BUCKET, row.video_path, 300),
+            }
+            for row in quality_result
+        ]
+        if not qualities:
+            qualities = [
+                {
+                    "label": "source",
+                    "stream_url": generate_presigned_url(VIDEO_BUCKET, video.video_url, 300),
+                }
+            ]
+
+        subtitle_result = await db.execute(
+            text(
+                """
+                SELECT vl.language_id, lm.language_name, vl.subtitle_path
+                FROM video_language vl
+                JOIN language_master lm ON lm.language_id = vl.language_id
+                WHERE vl.video_id = :video_id AND vl.subtitle_path IS NOT NULL
+                """
+            ),
+            {"video_id": video_id},
+        )
+        subtitles = [
+            {
+                "language_id": row.language_id,
+                "language_name": row.language_name,
+                "subtitle_url": generate_presigned_url(VIDEO_BUCKET, row.subtitle_path, 300),
+            }
+            for row in subtitle_result
+        ]
 
         # Initialize training history if not exists
         history_result = await db.execute(
@@ -166,7 +243,9 @@ class VideoService:
             await db.commit()
 
         return {
-            "stream_url": signed_url,
+            "stream_url": qualities[0]["stream_url"],
+            "qualities": qualities,
+            "subtitles": subtitles,
             "resume_position": (
                 max(
                     int(history.last_watched_position or 0),
@@ -241,6 +320,8 @@ class VideoService:
             forward_delta = min(forward_delta, elapsed_since_save + 2)
 
         watched_seconds = previous_watched + forward_delta
+        if current_position >= previous_furthest:
+            watched_seconds = max(watched_seconds, current_position)
         if total_duration > 0:
             watched_seconds = min(watched_seconds, total_duration)
             history.total_seconds = total_duration
@@ -256,8 +337,15 @@ class VideoService:
             percent = (watched_seconds / total_duration) * 100
             history.completion_percent = round(min(percent, 100), 2)
 
-        # Mark as completed when >= 95% watched
-        if history.completion_percent >= 95 and history.status != "Completed":
+        reached_end = total_duration > 0 and current_position >= max(0, total_duration - 1)
+        if reached_end:
+            history.watched_seconds = total_duration
+            history.furthest_position = max(previous_furthest, total_duration)
+            history.last_watched_position = total_duration
+            history.completion_percent = 100
+
+        # Mark as completed when >= 95% watched or player reaches the end.
+        if (history.completion_percent >= 95 or reached_end) and history.status != "Completed":
             history.status = "Completed"
             from datetime import datetime, timezone
 

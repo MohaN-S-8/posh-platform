@@ -26,6 +26,7 @@ export function CertificateTemplatePage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [assetUploading, setAssetUploading] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -82,6 +83,27 @@ export function CertificateTemplatePage() {
       setError(err.response?.data?.detail || "Unable to update template status.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const uploadAsset = async (template, assetType, file) => {
+    if (!file) return;
+    setAssetUploading(`${template.template_id}-${assetType}`);
+    setError("");
+    setSuccess("");
+    const formData = new FormData();
+    formData.append("asset_type", assetType);
+    formData.append("file", file);
+    try {
+      await apiClient.post(`/certificates/templates/${template.template_id}/asset`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setSuccess(`${assetType === "logo" ? "Logo" : "Signature"} uploaded successfully.`);
+      await loadTemplates();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to upload template asset.");
+    } finally {
+      setAssetUploading("");
     }
   };
 
@@ -181,7 +203,7 @@ export function CertificateTemplatePage() {
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "680px" }}>
           <thead>
             <tr style={{ background: "#17324d", color: "white" }}>
-              {["Template", "Font", "Color", "Status", "Actions"].map((heading) => (
+              {["Template", "Font", "Color", "Status", "Assets", "Actions"].map((heading) => (
                 <th key={heading} style={thStyle}>
                   {heading}
                 </th>
@@ -213,6 +235,30 @@ export function CertificateTemplatePage() {
                   </td>
                   <td style={tdStyle}>{template.status}</td>
                   <td style={tdStyle}>
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      <label>
+                        Logo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={assetUploading === `${template.template_id}-logo`}
+                          onChange={(e) => uploadAsset(template, "logo", e.target.files?.[0])}
+                        />
+                      </label>
+                      <label>
+                        Signature
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={assetUploading === `${template.template_id}-signature`}
+                          onChange={(e) =>
+                            uploadAsset(template, "signature", e.target.files?.[0])
+                          }
+                        />
+                      </label>
+                    </div>
+                  </td>
+                  <td style={tdStyle}>
                     <button
                       type="button"
                       onClick={() => toggleStatus(template)}
@@ -225,7 +271,7 @@ export function CertificateTemplatePage() {
               ))
             ) : (
               <tr>
-                <td colSpan={5} style={{ padding: "28px", color: "#64748b" }}>
+                <td colSpan={6} style={{ padding: "28px", color: "#64748b" }}>
                   No certificate templates created yet.
                 </td>
               </tr>
@@ -235,7 +281,7 @@ export function CertificateTemplatePage() {
       </div>
 
       <LoadingOverlay
-        show={loading || saving}
+        show={loading || saving || Boolean(assetUploading)}
         title={saving ? "Saving template" : "Loading templates"}
         message="Fetching certificate template configuration."
       />
