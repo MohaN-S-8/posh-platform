@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,6 +65,8 @@ async def company_analytics(
     current_user=Depends(require_roles([1, 2])),
 ):
     """Analytics for a specific company."""
+    if current_user.role_id == 2 and current_user.company_id != company_id:
+        raise HTTPException(403, "You do not have permission to access this company.")
 
     # Employee counts
     total_result = await db.execute(

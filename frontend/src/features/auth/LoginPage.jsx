@@ -1,28 +1,64 @@
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { useNavigate, Link } from "react-router-dom";
 import { authApi } from "../../api/auth";
+import { LoadingOverlay } from "../../components/LoadingOverlay";
+import { authInputStyle } from "../../styles/formStyles";
 import { useAuthStore } from "../../store/authStore";
 
-// Mirror backend validation exactly
 const loginSchema = z.object({
   email: z
     .string()
+    .trim()
+    .toLowerCase()
     .min(1, "Email is required")
     .email("Invalid email format")
-    .max(25, "Email must be at most 25 characters")
-    .transform((v) => v.trim().toLowerCase()),
+    .max(25, "Email must be at most 25 characters"),
   password: z
     .string()
     .min(8, "Minimum 8 characters")
-    .max(15, "Maximum 15 characters"),
+    .max(15, "Maximum 15 characters")
+    .regex(/[A-Z]/, "Must contain uppercase letter")
+    .regex(/[a-z]/, "Must contain lowercase letter")
+    .regex(/[0-9]/, "Must contain a number")
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must contain special character"),
 });
+
+const labelStyle = {
+  display: "block",
+  marginBottom: "6px",
+  fontWeight: 500,
+};
+
+const errorStyle = {
+  color: "#e74c3c",
+  fontSize: "12px",
+  marginTop: "4px",
+};
+
+const passwordToggleStyle = {
+  position: "absolute",
+  right: "10px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  border: "none",
+  background: "transparent",
+  color: "#5f6f7f",
+  cursor: "pointer",
+  width: "32px",
+  height: "32px",
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -44,7 +80,6 @@ export function LoginPage() {
       const { access_token, user_id, role_id, company_id } = res.data;
       setAuth({ user_id, role_id, company_id }, access_token);
 
-      // Redirect based on role
       if (role_id === 1 || role_id === 2) navigate("/admin");
       else if (role_id === 3) navigate("/hr");
       else navigate("/employee");
@@ -52,6 +87,10 @@ export function LoginPage() {
       const detail = err.response?.data?.detail;
       if (err.response?.status === 423) {
         setError(detail || "Account locked. Try again later.");
+      } else if (err.response?.status === 403) {
+        setError(
+          detail || "Your account is inactive. Contact your administrator.",
+        );
       } else {
         setError(detail || "Invalid email or password.");
       }
@@ -68,6 +107,7 @@ export function LoginPage() {
         alignItems: "center",
         justifyContent: "center",
         background: "#f5f7fa",
+        padding: "20px",
       }}
     >
       <div
@@ -85,102 +125,97 @@ export function LoginPage() {
         >
           POSH Training Platform
         </h1>
-        <p
-          style={{
-            color: "#666",
-            textAlign: "center",
-            marginBottom: "32px",
-          }}
-        >
+        <p style={{ color: "#666", textAlign: "center", marginBottom: "16px" }}>
           Sign in to your account
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Email field */}
+        <div
+          style={{
+            background: "#eef4f8",
+            border: "1px solid #cdd9e2",
+            borderRadius: "8px",
+            padding: "12px 14px",
+            marginBottom: "24px",
+            fontSize: "13px",
+            color: "#17324d",
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: "4px" }}>
+            Default development logins
+          </div>
+          <div>Admin: admin@posh.com / Admin@1234</div>
+          <div>HR: hr@posh.com / Admin@1234</div>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div style={{ marginBottom: "20px" }}>
-            <label
-              htmlFor="email"
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label htmlFor="email" style={labelStyle}>
               Email Address *
             </label>
             <input
               id="email"
               type="email"
-              {...register("email")}
+              autoComplete="email"
               placeholder="you@company.com"
-              aria-describedby={errors.email ? "email-error" : undefined}
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? "email_error" : undefined}
+              {...register("email")}
               style={{
+                ...authInputStyle(!!errors.email),
                 width: "100%",
-                padding: "10px 14px",
-                border: `1px solid ${errors.email ? "#e74c3c" : "#ddd"}`,
+                height: "44px",
+                display: "block",
+                backgroundColor: "#ffffff",
+                border: `1.5px solid ${errors.email ? "#e74c3c" : "#cfd7df"}`,
                 borderRadius: "6px",
-                fontSize: "14px",
                 boxSizing: "border-box",
               }}
             />
             {errors.email && (
-              <p
-                id="email-error"
-                role="alert"
-                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
-              >
+              <p id="email_error" role="alert" style={errorStyle}>
                 {errors.email.message}
               </p>
             )}
           </div>
 
-          {/* Password field */}
           <div style={{ marginBottom: "20px" }}>
-            <label
-              htmlFor="password"
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label htmlFor="password" style={labelStyle}>
               Password *
             </label>
             <div style={{ position: "relative" }}>
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                {...register("password")}
+                autoComplete="current-password"
                 placeholder="Your password"
+                aria-invalid={!!errors.password}
+                aria-describedby={
+                  errors.password ? "password_error" : undefined
+                }
+                {...register("password")}
                 style={{
-                  width: "100%",
-                  padding: "10px 44px 10px 14px",
-                  border: `1px solid ${errors.password ? "#e74c3c" : "#ddd"}`,
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  boxSizing: "border-box",
+                  ...authInputStyle(!!errors.password),
+                  paddingRight: "46px",
                 }}
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((value) => !value)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
-                style={{
-                  position: "absolute",
-                  right: "12px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#666",
-                }}
+                title={showPassword ? "Hide password" : "Show password"}
+                style={passwordToggleStyle}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
               </button>
             </div>
             {errors.password && (
-              <p
-                style={{ color: "#e74c3c", fontSize: "12px", marginTop: "4px" }}
-              >
+              <p id="password_error" role="alert" style={errorStyle}>
                 {errors.password.message}
               </p>
             )}
           </div>
 
-          {/* Global error */}
           {error && (
             <div
               role="alert"
@@ -198,7 +233,6 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Submit button — disabled until form valid */}
           <button
             type="submit"
             disabled={!isValid || loading}
@@ -229,12 +263,17 @@ export function LoginPage() {
         </div>
         <div style={{ textAlign: "center", marginTop: "12px" }}>
           <span style={{ fontSize: "14px", color: "#666" }}>
-            Don`&#39;t have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link to="/signup" style={{ color: "#1a3c5e", fontWeight: 600 }}>
               Sign up
             </Link>
           </span>
         </div>
+        <LoadingOverlay
+          show={loading}
+          title="Signing in"
+          message="Checking your account and opening your dashboard."
+        />
       </div>
     </div>
   );

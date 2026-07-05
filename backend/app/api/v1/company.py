@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_roles
@@ -39,6 +39,8 @@ async def get_company(
     current_user=Depends(require_roles(ADMIN_ROLES)),
 ):
     """Get a company by ID."""
+    if current_user.role_id == 2 and current_user.company_id != company_id:
+        raise HTTPException(403, "You do not have permission to access this company.")
     return await company_service.get_by_id(db, company_id)
 
 
@@ -50,6 +52,8 @@ async def update_company(
     current_user=Depends(require_roles(ADMIN_ROLES)),
 ):
     """Update company details."""
+    if current_user.role_id == 2 and current_user.company_id != company_id:
+        raise HTTPException(403, "You do not have permission to update this company.")
     return await company_service.update(db, company_id, data)
 
 

@@ -1,20 +1,23 @@
 import os
-from typing import Optional
 
 import boto3
 from botocore.client import Config
 
-# MinIO uses S3-compatible API — same code works for AWS S3
 _client = None
+_presign_client = None
+
+
+def _endpoint_url(value: str) -> str:
+    return value if value.startswith(("http://", "https://")) else f"http://{value}"
 
 
 def get_storage_client():
-    """Get or create the MinIO/S3 client (singleton)."""
+    """Get or create the internal MinIO/S3 client used by backend services."""
     global _client
     if _client is None:
         _client = boto3.client(
             "s3",
-            endpoint_url=f"http://{os.environ.get('MINIO_ENDPOINT', 'minio:9000')}",
+            endpoint_url=_endpoint_url(os.environ.get("MINIO_ENDPOINT", "minio:9000")),
             aws_access_key_id=os.environ.get("MINIO_ROOT_USER", "minioadmin"),
             aws_secret_access_key=os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123"),
             config=Config(signature_version="s3v4"),
@@ -23,8 +26,27 @@ def get_storage_client():
     return _client
 
 
+def get_presign_client():
+    """Create signed URLs with the browser-accessible MinIO endpoint."""
+    global _presign_client
+    if _presign_client is None:
+        endpoint = os.environ.get("MINIO_PUBLIC_ENDPOINT") or os.environ.get(
+            "MINIO_ENDPOINT",
+            "minio:9000",
+        )
+        _presign_client = boto3.client(
+            "s3",
+            endpoint_url=_endpoint_url(endpoint),
+            aws_access_key_id=os.environ.get("MINIO_ROOT_USER", "minioadmin"),
+            aws_secret_access_key=os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123"),
+            config=Config(signature_version="s3v4"),
+            region_name="us-east-1",
+        )
+    return _presign_client
+
+
 def ensure_bucket_exists(bucket_name: str) -> None:
-    """Create bucket if it doesn't exist."""
+    """Create bucket if it does not exist."""
     client = get_storage_client()
     try:
         client.head_bucket(Bucket=bucket_name)
@@ -38,10 +60,7 @@ def upload_file(
     object_key: str,
     content_type: str = "application/octet-stream",
 ) -> str:
-    """
-    Upload a file to MinIO/S3.
-    Returns the object key (path) — NOT a public URL.
-    """
+    """Upload a file to MinIO/S3 and return its object key."""
     ensure_bucket_exists(bucket)
     client = get_storage_client()
     client.put_object(
@@ -54,18 +73,13 @@ def upload_file(
 
 
 def generate_presigned_url(bucket: str, object_key: str, expiry_seconds: int = 300) -> str:
-    """
-    Generate a short-lived URL for secure file access.
-    Default: 5 minutes (300 seconds).
-    Only users with a valid signed URL can access the file.
-    """
-    client = get_storage_client()
-    url = client.generate_presigned_url(
+    """Generate a short-lived signed URL for secure browser access."""
+    client = get_presign_client()
+    return client.generate_presigned_url(
         "get_object",
         Params={"Bucket": bucket, "Key": object_key},
         ExpiresIn=expiry_seconds,
     )
-    return url
 
 
 def delete_file(bucket: str, object_key: str) -> None:

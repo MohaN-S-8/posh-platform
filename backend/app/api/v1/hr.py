@@ -13,6 +13,15 @@ hr_service = HRService()
 HR_ROLES = [1, 2, 3]  # Super Admin, Company Admin, HR
 
 
+@router.get("/employees")
+async def list_assignable_employees(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_roles(HR_ROLES)),
+):
+    """List active employees and departments available for training assignment."""
+    return await hr_service.list_assignable_employees(db, current_user.company_id)
+
+
 @router.post("/employees/bulk-upload")
 async def bulk_upload_employees(
     file: UploadFile = File(...),
@@ -72,4 +81,32 @@ async def download_employee_report(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=employee_training_report.xlsx"},
+    )
+
+
+@router.get("/reports/departments")
+async def download_department_report(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_roles(HR_ROLES)),
+):
+    """Download department compliance report as Excel file."""
+    excel_bytes = await hr_service.generate_department_report(db, current_user.company_id)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=department_compliance_report.xlsx"},
+    )
+
+
+@router.get("/reports/certificates")
+async def download_certificate_report(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_roles(HR_ROLES)),
+):
+    """Download issued certificate report as Excel file."""
+    excel_bytes = await hr_service.generate_certificate_report(db, current_user.company_id)
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=certificate_report.xlsx"},
     )

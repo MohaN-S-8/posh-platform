@@ -10,6 +10,13 @@ class CertificateTemplateCreate(BaseModel):
     color_code: Optional[str] = "#1a3c5e"
 
 
+class CertificateTemplateUpdate(BaseModel):
+    template_name: Optional[str] = None
+    font_name: Optional[str] = None
+    color_code: Optional[str] = None
+    status: Optional[str] = None
+
+
 class CertificateTemplateResponse(BaseModel):
     template_id: int
     template_name: str

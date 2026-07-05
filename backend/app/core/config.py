@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     FRONTEND_URL: str = "http://localhost:80"
+    PUBLIC_APP_URL: str = "http://localhost:80"
     # App
     APP_ENV: str = "development"
 

@@ -11,3 +11,23 @@ class AnswerSubmit(BaseModel):
 class AssessmentSubmit(BaseModel):
     video_id: int
     answers: list[AnswerSubmit]
+
+
+class AssessmentOptionResponse(BaseModel):
+    option_id: int
+    option_label: str
+    option_text: str
+
+    class Config:
+        from_attributes = True
+
+
+class AssessmentQuestionResponse(BaseModel):
+    question_id: int
+    video_id: int
+    question_text: str
+    question_type: str
+    options: list[AssessmentOptionResponse]
+
+    class Config:
+        from_attributes = True

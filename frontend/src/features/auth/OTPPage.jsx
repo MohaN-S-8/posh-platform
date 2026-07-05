@@ -38,7 +38,7 @@ export function OTPPage() {
     try {
       await authApi.verifyOtp(email, code);
       navigate("/login", {
-        state: { message: "Email verified! You can now log in." },
+        state: { message: "Registration completed successfully." },
       });
     } catch (err) {
       setError(err.response?.data?.detail || "Invalid or expired OTP.");

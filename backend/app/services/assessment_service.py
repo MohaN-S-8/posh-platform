@@ -6,12 +6,49 @@ from app.models.training import (
     AssessmentOption,
     AssessmentQuestion,
     AssessmentResult,
+    CourseAssignment,
     TrainingHistory,
 )
+from app.models.video import VideoMaster
 from app.schemas.assessment import AssessmentSubmit
 
 
 class AssessmentService:
+    async def questions(self, db: AsyncSession, video_id: int, company_id: int) -> list[dict]:
+        video_result = await db.execute(
+            select(VideoMaster).where(
+                VideoMaster.video_id == video_id,
+                VideoMaster.company_id == company_id,
+                VideoMaster.status == "Published",
+            )
+        )
+        if not video_result.scalar_one_or_none():
+            raise HTTPException(404, "Video not found.")
+
+        question_result = await db.execute(
+            select(AssessmentQuestion)
+            .where(AssessmentQuestion.video_id == video_id)
+            .order_by(AssessmentQuestion.question_id)
+        )
+        questions = question_result.scalars().all()
+        response = []
+        for question in questions:
+            option_result = await db.execute(
+                select(AssessmentOption)
+                .where(AssessmentOption.question_id == question.question_id)
+                .order_by(AssessmentOption.option_label)
+            )
+            response.append(
+                {
+                    "question_id": question.question_id,
+                    "video_id": question.video_id,
+                    "question_text": question.question_text,
+                    "question_type": question.question_type,
+                    "options": option_result.scalars().all(),
+                }
+            )
+        return response
+
     async def submit(
         self, db: AsyncSession, user_id: int, data: AssessmentSubmit, company_id: int
     ) -> dict:
@@ -47,7 +84,8 @@ class AssessmentService:
         for answer in data.answers:
             q_result = await db.execute(
                 select(AssessmentQuestion).where(
-                    AssessmentQuestion.question_id == answer.question_id
+                    AssessmentQuestion.question_id == answer.question_id,
+                    AssessmentQuestion.video_id == data.video_id,
                 )
             )
             question = q_result.scalar_one_or_none()
@@ -55,7 +93,13 @@ class AssessmentService:
                 correct += 1
 
         score = (correct / total * 100) if total > 0 else 0
-        passing_score = 70.0  # default; can be from course_assignment
+        passing_score_result = await db.execute(
+            select(CourseAssignment.passing_score).where(
+                CourseAssignment.video_id == data.video_id,
+                CourseAssignment.company_id == company_id,
+            )
+        )
+        passing_score = float(passing_score_result.scalar() or 70.0)
         result = "Pass" if score >= passing_score else "Fail"
 
         # 4. Save result

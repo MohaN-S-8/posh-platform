@@ -8,16 +8,46 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
+from app.models.certificate import Certificate
 from app.models.company import CompanyMaster
 from app.models.hr import EmployeeUploadBatch
 from app.models.training import CourseAssignment, TrainingHistory
 from app.models.user import UserMaster
+from app.models.video import VideoMaster
 from app.schemas.hr import TrainingAssignRequest
 
 REQUIRED_COLUMNS = {"employee_id", "first_name", "email", "mobile", "role_id"}
 
 
 class HRService:
+    async def list_assignable_employees(self, db: AsyncSession, company_id: int) -> dict:
+        result = await db.execute(
+            select(UserMaster)
+            .where(
+                UserMaster.company_id == company_id,
+                UserMaster.role_id == 4,
+                UserMaster.status == "Active",
+                UserMaster.is_deleted == "N",
+            )
+            .order_by(UserMaster.first_name, UserMaster.last_name)
+        )
+        employees = result.scalars().all()
+        departments = sorted({employee.department for employee in employees if employee.department})
+        return {
+            "employees": [
+                {
+                    "user_id": employee.user_id,
+                    "employee_id": employee.employee_id,
+                    "first_name": employee.first_name,
+                    "last_name": employee.last_name,
+                    "email": employee.email,
+                    "department": employee.department,
+                    "designation": employee.designation,
+                }
+                for employee in employees
+            ],
+            "departments": departments,
+        }
 
     async def bulk_upload_employees(
         self,
@@ -178,15 +208,36 @@ class HRService:
         """Assign a video course to individual / department / entire company."""
 
         due_date = datetime.now(timezone.utc) + timedelta(days=data.due_days)
+        video_result = await db.execute(
+            select(VideoMaster).where(
+                VideoMaster.video_id == data.video_id,
+                VideoMaster.company_id == company_id,
+                VideoMaster.status == "Published",
+            )
+        )
+        if not video_result.scalar_one_or_none():
+            raise HTTPException(404, "Published video not found for this company.")
 
         if data.assign_type == "Individual":
             if not data.assigned_to_user_id:
                 raise HTTPException(400, "assigned_to_user_id required for Individual assignment")
 
+            target_result = await db.execute(
+                select(UserMaster).where(
+                    UserMaster.user_id == data.assigned_to_user_id,
+                    UserMaster.company_id == company_id,
+                    UserMaster.status == "Active",
+                    UserMaster.is_deleted == "N",
+                )
+            )
+            if not target_result.scalar_one_or_none():
+                raise HTTPException(404, "Employee not found for this company.")
+
             # Check already assigned
             existing = await db.execute(
                 select(CourseAssignment).where(
                     CourseAssignment.video_id == data.video_id,
+                    CourseAssignment.company_id == company_id,
                     CourseAssignment.assigned_to_user_id == data.assigned_to_user_id,
                     CourseAssignment.assign_type == "Individual",
                 )
@@ -216,6 +267,28 @@ class HRService:
                     400, "assigned_to_department required for Department assignment"
                 )
 
+            department_result = await db.execute(
+                select(func.count()).where(
+                    UserMaster.company_id == company_id,
+                    UserMaster.department == data.assigned_to_department,
+                    UserMaster.status == "Active",
+                    UserMaster.is_deleted == "N",
+                )
+            )
+            if (department_result.scalar() or 0) == 0:
+                raise HTTPException(404, "Department not found for this company.")
+
+            existing = await db.execute(
+                select(CourseAssignment).where(
+                    CourseAssignment.video_id == data.video_id,
+                    CourseAssignment.company_id == company_id,
+                    CourseAssignment.assigned_to_department == data.assigned_to_department,
+                    CourseAssignment.assign_type == "Department",
+                )
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(400, "This course is already assigned to this department.")
+
             assignment = CourseAssignment(
                 video_id=data.video_id,
                 assigned_by=assigned_by,
@@ -233,6 +306,16 @@ class HRService:
             }
 
         elif data.assign_type == "Company-Wide":
+            existing = await db.execute(
+                select(CourseAssignment).where(
+                    CourseAssignment.video_id == data.video_id,
+                    CourseAssignment.company_id == company_id,
+                    CourseAssignment.assign_type == "Company-Wide",
+                )
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(400, "This course is already assigned company-wide.")
+
             assignment = CourseAssignment(
                 video_id=data.video_id,
                 assigned_by=assigned_by,
@@ -299,10 +382,40 @@ class HRService:
             )
             .group_by(UserMaster.department)
         )
-        departments = [
-            {"department": row.department or "Unassigned", "total": row.total}
-            for row in dept_result
-        ]
+        departments = []
+        for row in dept_result:
+            department_name = row.department or "Unassigned"
+            completed_dept_result = await db.execute(
+                select(func.count(UserMaster.user_id.distinct()))
+                .join(
+                    TrainingHistory,
+                    and_(
+                        TrainingHistory.user_id == UserMaster.user_id,
+                        TrainingHistory.company_id == company_id,
+                        TrainingHistory.status == "Completed",
+                    ),
+                )
+                .where(
+                    UserMaster.company_id == company_id,
+                    UserMaster.status == "Active",
+                    UserMaster.role_id == 4,
+                    UserMaster.is_deleted == "N",
+                    UserMaster.department == row.department,
+                )
+            )
+            department_completed = completed_dept_result.scalar() or 0
+            department_rate = (
+                round((department_completed / row.total * 100), 2) if row.total else 0.0
+            )
+            departments.append(
+                {
+                    "department": department_name,
+                    "total": row.total,
+                    "completed": department_completed,
+                    "pending": max(0, row.total - department_completed),
+                    "compliance_rate": department_rate,
+                }
+            )
 
         # Overdue employees (assigned but not completed past due date)
         now = datetime.now(timezone.utc)
@@ -393,6 +506,81 @@ class HRService:
 
             # Auto-fit column widths
             worksheet = writer.sheets["Employee Training Report"]
+            for col in worksheet.columns:
+                max_length = max(len(str(cell.value or "")) for cell in col)
+                worksheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
+
+        output.seek(0)
+        return output.read()
+
+    async def generate_department_report(self, db: AsyncSession, company_id: int) -> bytes:
+        """Generate an Excel report with department-level compliance."""
+
+        dashboard = await self.get_compliance_dashboard(db, company_id)
+        df = pd.DataFrame(
+            [
+                {
+                    "Department": row["department"],
+                    "Total Employees": row["total"],
+                    "Completed": row["completed"],
+                    "Pending": row["pending"],
+                    "Compliance %": row["compliance_rate"],
+                }
+                for row in dashboard["department_breakdown"]
+            ]
+        )
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Department Compliance")
+            worksheet = writer.sheets["Department Compliance"]
+            for col in worksheet.columns:
+                max_length = max(len(str(cell.value or "")) for cell in col)
+                worksheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
+
+        output.seek(0)
+        return output.read()
+
+    async def generate_certificate_report(self, db: AsyncSession, company_id: int) -> bytes:
+        """Generate an Excel report of issued certificates."""
+
+        result = await db.execute(
+            select(
+                Certificate.certificate_number,
+                Certificate.course_name,
+                Certificate.issue_date,
+                Certificate.completion_date,
+                Certificate.status,
+                UserMaster.employee_id,
+                UserMaster.first_name,
+                UserMaster.last_name,
+                UserMaster.email,
+                UserMaster.department,
+            )
+            .join(UserMaster, UserMaster.user_id == Certificate.user_id)
+            .where(Certificate.company_id == company_id)
+            .order_by(Certificate.issue_date.desc(), Certificate.certificate_id.desc())
+        )
+        rows = result.all()
+        data = [
+            {
+                "Certificate Number": row.certificate_number,
+                "Employee ID": row.employee_id,
+                "Employee Name": f"{row.first_name} {row.last_name or ''}".strip(),
+                "Email": row.email,
+                "Department": row.department or "",
+                "Course": row.course_name,
+                "Completion Date": str(row.completion_date or ""),
+                "Issue Date": str(row.issue_date or ""),
+                "Status": row.status,
+            }
+            for row in rows
+        ]
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            pd.DataFrame(data).to_excel(writer, index=False, sheet_name="Certificates")
+            worksheet = writer.sheets["Certificates"]
             for col in worksheet.columns:
                 max_length = max(len(str(cell.value or "")) for cell in col)
                 worksheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)

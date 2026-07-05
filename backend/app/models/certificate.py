@@ -43,6 +43,7 @@ class Certificate(Base):
 
     certificate_id = Column(BigInteger, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("user_master.user_id"))
+    video_id = Column(Integer, ForeignKey("video_master.video_id"), nullable=True)
     company_id = Column(Integer, ForeignKey("company_master.company_id"))
     template_id = Column(Integer, ForeignKey("certificate_template.template_id"), nullable=True)
     certificate_number = Column(String(100), unique=True)  # e.g. POSH-2026-000123

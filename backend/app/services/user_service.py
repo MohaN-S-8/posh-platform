@@ -21,13 +21,16 @@ class UserService:
         result = await db.execute(query)
         return result.scalars().all()
 
-    async def get_by_id(self, db: AsyncSession, user_id: int) -> UserMaster:
-        result = await db.execute(
-            select(UserMaster).where(
-                UserMaster.user_id == user_id,
-                UserMaster.is_deleted == "N",
-            )
+    async def get_by_id(
+        self, db: AsyncSession, user_id: int, company_id: Optional[int] = None
+    ) -> UserMaster:
+        query = select(UserMaster).where(
+            UserMaster.user_id == user_id,
+            UserMaster.is_deleted == "N",
         )
+        if company_id is not None:
+            query = query.where(UserMaster.company_id == company_id)
+        result = await db.execute(query)
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
@@ -80,8 +83,10 @@ class UserService:
         await db.refresh(user)
         return user
 
-    async def update(self, db: AsyncSession, user_id: int, data: UserUpdate) -> UserMaster:
-        user = await self.get_by_id(db, user_id)
+    async def update(
+        self, db: AsyncSession, user_id: int, data: UserUpdate, company_id: Optional[int] = None
+    ) -> UserMaster:
+        user = await self.get_by_id(db, user_id, company_id)
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(user, field, value)
@@ -89,14 +94,18 @@ class UserService:
         await db.refresh(user)
         return user
 
-    async def set_status(self, db: AsyncSession, user_id: int, new_status: str) -> UserMaster:
-        user = await self.get_by_id(db, user_id)
+    async def set_status(
+        self, db: AsyncSession, user_id: int, new_status: str, company_id: Optional[int] = None
+    ) -> UserMaster:
+        user = await self.get_by_id(db, user_id, company_id)
         user.status = new_status
         await db.commit()
         return user
 
-    async def reset_password(self, db: AsyncSession, user_id: int, new_password: str) -> dict:
-        user = await self.get_by_id(db, user_id)
+    async def reset_password(
+        self, db: AsyncSession, user_id: int, new_password: str, company_id: Optional[int] = None
+    ) -> dict:
+        user = await self.get_by_id(db, user_id, company_id)
         user.password_hash = hash_password(new_password)
         await db.commit()
         return {"message": "Password reset successfully."}

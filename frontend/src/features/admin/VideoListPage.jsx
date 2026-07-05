@@ -1,15 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
+import { LoadingOverlay } from "../../components/LoadingOverlay";
 
 export function VideoListPage() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [publishingId, setPublishingId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
-  const fileInputRef = useRef(null);
+  const [overlay, setOverlay] = useState(null);
+  const [lastUploadedVideo, setLastUploadedVideo] = useState(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -17,21 +21,27 @@ export function VideoListPage() {
     duration_minutes: "",
   });
 
-  useEffect(() => {
-    fetchVideos();
-  }, []);
-
-  const fetchVideos = async () => {
-    setLoading(true);
+  const fetchVideos = async ({ showLoading = true } = {}) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+    setError("");
     try {
-      // Get all company videos — use compliance endpoint for now
-      const res = await apiClient.get("/hr/compliance/dashboard");
-      setVideos([]); // Videos list endpoint to be called with admin token
-      setLoading(false);
-    } catch {
+      const res = await apiClient.get("/videos/");
+      setVideos(res.data);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to load videos.");
+    } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => {
+      fetchVideos({ showLoading: false });
+    }, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, []);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -40,6 +50,10 @@ export function VideoListPage() {
       return;
     }
     setUploading(true);
+    setOverlay({
+      title: "Uploading video",
+      message: "Keep this page open while the video is uploaded.",
+    });
     setError("");
     setUploadProgress("Uploading...");
 
@@ -48,14 +62,22 @@ export function VideoListPage() {
     formData.append("title", form.title);
     if (form.description) formData.append("description", form.description);
     if (form.category_id) formData.append("category_id", form.category_id);
-    if (form.duration_minutes)
+    if (form.duration_minutes) {
       formData.append("duration_minutes", form.duration_minutes);
+    }
 
     try {
-      await apiClient.post("/videos/upload", formData, {
+      const res = await apiClient.post("/videos/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setUploadProgress("✅ Upload successful! Video is in Draft status.");
+      setLastUploadedVideo(res.data);
+      setVideos((current) => {
+        const withoutDuplicate = current.filter(
+          (video) => video.video_id !== res.data.video_id,
+        );
+        return [res.data, ...withoutDuplicate];
+      });
+      setUploadProgress("Upload successful. Video is saved as Draft. Publish it now so employees can watch it.");
       setForm({
         title: "",
         description: "",
@@ -63,30 +85,70 @@ export function VideoListPage() {
         duration_minutes: "",
       });
       fileInputRef.current.value = "";
+      await fetchVideos();
     } catch (err) {
       setError(err.response?.data?.detail || "Upload failed.");
       setUploadProgress("");
     } finally {
       setUploading(false);
+      setOverlay(null);
     }
   };
 
+  const publishVideo = async (videoId) => {
+    setPublishingId(videoId);
+    setOverlay({
+      title: "Publishing video",
+      message: "Making this training available to assigned employees.",
+    });
+    setError("");
+    try {
+      await apiClient.patch(`/videos/${videoId}/publish`);
+      setLastUploadedVideo((current) =>
+        current?.video_id === videoId ? { ...current, status: "Published" } : current,
+      );
+      setVideos((current) =>
+        current.map((video) =>
+          video.video_id === videoId ? { ...video, status: "Published" } : video,
+        ),
+      );
+      await fetchVideos();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Unable to publish video.");
+    } finally {
+      setPublishingId(null);
+      setOverlay(null);
+    }
+  };
+
+  const statusStyle = (status) => {
+    if (status === "Published") {
+      return { background: "#e8f5ee", color: "#1f7a4d" };
+    }
+    if (status === "Archived") {
+      return { background: "#f2f3f5", color: "#667085" };
+    }
+    return { background: "#fff5df", color: "#9a6400" };
+  };
+
   return (
-    <div style={{ padding: "32px", background: "#f5f7fa", minHeight: "100vh" }}>
+    <div style={{ padding: "32px", background: "#f6f8fb", minHeight: "100vh" }}>
       <div style={{ marginBottom: "24px" }}>
         <button
           onClick={() => navigate("/admin")}
           style={{
             background: "none",
             border: "none",
-            color: "#1a3c5e",
+            color: "#17324d",
             cursor: "pointer",
             marginBottom: "8px",
           }}
         >
-          ← Back to Dashboard
+          Back to Dashboard
         </button>
-        <h1 style={{ color: "#1a3c5e", margin: 0 }}>Video Management</h1>
+        <h1 style={{ color: "#17324d", margin: 0, fontSize: "30px" }}>
+          Video Management
+        </h1>
       </div>
 
       {error && (
@@ -96,7 +158,7 @@ export function VideoListPage() {
             border: "1px solid #e74c3c",
             borderRadius: "8px",
             padding: "12px 16px",
-            color: "#e74c3c",
+            color: "#c0392b",
             marginBottom: "16px",
           }}
         >
@@ -104,122 +166,61 @@ export function VideoListPage() {
         </div>
       )}
 
-      {/* Upload Form */}
       <div
         style={{
           background: "white",
-          borderRadius: "12px",
+          borderRadius: "8px",
           padding: "24px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           marginBottom: "24px",
         }}
       >
-        <h3 style={{ color: "#1a3c5e", marginTop: 0 }}>Upload New Video</h3>
+        <h3 style={{ color: "#17324d", marginTop: 0 }}>Upload New Video</h3>
         <p style={{ color: "#666", fontSize: "13px", marginBottom: "20px" }}>
           Supported formats: MP4, AVI, MOV. Maximum size: 500MB. Videos are
-          stored securely — never publicly accessible.
+          stored securely and remain private until published.
         </p>
         <form onSubmit={handleUpload}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
               gap: "16px",
               marginBottom: "16px",
             }}
           >
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "4px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                }}
-              >
-                Video Title *
-              </label>
+              <label style={labelStyle}>Video Title *</label>
               <input
                 required
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #ddd",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  boxSizing: "border-box",
-                }}
+                style={inputStyle}
               />
             </div>
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "4px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                }}
-              >
-                Duration (minutes)
-              </label>
+              <label style={labelStyle}>Duration (minutes)</label>
               <input
                 type="number"
                 value={form.duration_minutes}
                 onChange={(e) =>
                   setForm({ ...form, duration_minutes: e.target.value })
                 }
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #ddd",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  boxSizing: "border-box",
-                }}
+                style={inputStyle}
               />
             </div>
           </div>
           <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "4px",
-                fontWeight: 500,
-                fontSize: "14px",
-              }}
-            >
-              Description
-            </label>
+            <label style={labelStyle}>Description</label>
             <textarea
               value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                border: "1px solid #ddd",
-                borderRadius: "6px",
-                fontSize: "14px",
-                boxSizing: "border-box",
-                resize: "vertical",
-              }}
+              style={{ ...inputStyle, resize: "vertical" }}
             />
           </div>
           <div style={{ marginBottom: "16px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "4px",
-                fontWeight: 500,
-                fontSize: "14px",
-              }}
-            >
-              Video File *
-            </label>
+            <label style={labelStyle}>Video File *</label>
             <input
               type="file"
               ref={fileInputRef}
@@ -230,15 +231,41 @@ export function VideoListPage() {
           {uploadProgress && (
             <div
               style={{
-                padding: "10px 14px",
-                background: "#e8f5e9",
+                padding: "14px",
+                background: "#e8f5ee",
                 borderRadius: "6px",
-                color: "#27ae60",
+                color: "#1f7a4d",
                 fontSize: "14px",
                 marginBottom: "16px",
               }}
             >
-              {uploadProgress}
+              <div style={{ fontWeight: 700, marginBottom: "8px" }}>{uploadProgress}</div>
+              {lastUploadedVideo?.status === "Draft" && (
+                <button
+                  type="button"
+                  onClick={() => publishVideo(lastUploadedVideo.video_id)}
+                  disabled={publishingId === lastUploadedVideo.video_id}
+                  style={{
+                    padding: "8px 16px",
+                    background:
+                      publishingId === lastUploadedVideo.video_id ? "#93a4b7" : "#17324d",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor:
+                      publishingId === lastUploadedVideo.video_id ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {publishingId === lastUploadedVideo.video_id
+                    ? "Publishing..."
+                    : "Publish Now"}
+                </button>
+              )}
+              {lastUploadedVideo?.status === "Published" && (
+                <div style={{ color: "#1f7a4d", fontWeight: 700 }}>
+                  Published. Employees can watch it after assignment.
+                </div>
+              )}
             </div>
           )}
           <button
@@ -246,7 +273,7 @@ export function VideoListPage() {
             disabled={uploading}
             style={{
               padding: "10px 24px",
-              background: uploading ? "#93b8d4" : "#1a3c5e",
+              background: uploading ? "#93a4b7" : "#17324d",
               color: "white",
               border: "none",
               borderRadius: "6px",
@@ -262,19 +289,126 @@ export function VideoListPage() {
       <div
         style={{
           background: "white",
-          borderRadius: "12px",
+          borderRadius: "8px",
           padding: "24px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
         }}
       >
-        <p style={{ color: "#666", fontSize: "14px" }}>
-          After uploading a video, go to{" "}
-          <strong>http://localhost:8000/docs</strong> →
-          <code> PATCH /api/v1/videos/{"{video_id}"}/publish</code> to publish
-          it so employees can watch it. The video management UI will be expanded
-          in the next iteration.
-        </p>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "16px",
+            marginBottom: "18px",
+          }}
+        >
+          <h3 style={{ color: "#17324d", margin: 0 }}>Uploaded Videos</h3>
+          <button
+            type="button"
+            onClick={fetchVideos}
+            style={{
+              padding: "8px 14px",
+              background: "#eef4f8",
+              color: "#17324d",
+              border: "1px solid #cdd9e2",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {loading ? (
+          <p style={{ color: "#666" }}>Loading videos...</p>
+        ) : videos.length === 0 ? (
+          <p style={{ color: "#666" }}>No videos uploaded yet.</p>
+        ) : (
+          <div style={{ display: "grid", gap: "12px" }}>
+            {videos.map((video) => (
+              <div
+                key={video.video_id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "16px",
+                  flexWrap: "wrap",
+                  padding: "16px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                }}
+              >
+                <div>
+                  <h4 style={{ color: "#17324d", margin: "0 0 6px" }}>
+                    {video.title}
+                  </h4>
+                  <p style={{ color: "#667085", margin: 0, fontSize: "13px" }}>
+                    ID: {video.video_id}
+                    {video.duration_minutes
+                      ? ` - ${video.duration_minutes} min`
+                      : ""}
+                  </p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span
+                    style={{
+                      ...statusStyle(video.status),
+                      padding: "5px 10px",
+                      borderRadius: "999px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {video.status}
+                  </span>
+                  {video.status === "Draft" && (
+                    <button
+                      type="button"
+                      onClick={() => publishVideo(video.video_id)}
+                      disabled={publishingId === video.video_id}
+                      style={{
+                        padding: "8px 16px",
+                        background:
+                          publishingId === video.video_id ? "#93a4b7" : "#17324d",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor:
+                          publishingId === video.video_id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {publishingId === video.video_id ? "Publishing..." : "Publish"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+      <LoadingOverlay
+        show={Boolean(overlay) || loading}
+        title={overlay?.title || "Loading videos"}
+        message={overlay?.message || "Fetching the latest video list."}
+      />
     </div>
   );
 }
+
+const labelStyle = {
+  display: "block",
+  marginBottom: "4px",
+  fontWeight: 500,
+  fontSize: "14px",
+};
+
+const inputStyle = {
+  width: "100%",
+  padding: "8px 12px",
+  border: "1px solid #ddd",
+  borderRadius: "6px",
+  fontSize: "14px",
+  boxSizing: "border-box",
+};

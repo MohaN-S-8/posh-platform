@@ -1,20 +1,34 @@
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { useNavigate, Link } from "react-router-dom";
 import { authApi } from "../../api/auth";
+import { LoadingOverlay } from "../../components/LoadingOverlay";
+import { authInputStyle } from "../../styles/formStyles";
+
+const lettersOnly = /^[a-zA-Z\s]+$/;
 
 const signupSchema = z
   .object({
     first_name: z
       .string()
+      .trim()
       .min(2, "Minimum 2 characters")
       .max(50, "Maximum 50 characters")
-      .regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
-    last_name: z.string().regex(/^[a-zA-Z\s]*$/, "Only letters allowed"),
+      .regex(lettersOnly, "Only letters allowed"),
+    last_name: z
+      .string()
+      .trim()
+      .min(1, "Last name is required")
+      .max(50, "Maximum 50 characters")
+      .regex(lettersOnly, "Only letters allowed"),
     email: z
       .string()
+      .trim()
+      .toLowerCase()
       .min(1, "Email is required")
       .email("Invalid email format")
       .max(25, "Maximum 25 characters"),
@@ -27,17 +41,50 @@ const signupSchema = z
       .regex(/[0-9]/, "Must contain a number")
       .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must contain special character"),
     confirm_password: z.string().min(1, "Please confirm password"),
-    mobile: z.string().regex(/^\d{10}$/, "Must be exactly 10 digits"),
+    mobile: z
+      .string()
+      .trim()
+      .regex(/^\d{10}$/, "Must be exactly 10 digits"),
   })
-  .refine((d) => d.password === d.confirm_password, {
+  .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match",
     path: ["confirm_password"],
   });
+
+const labelStyle = {
+  display: "block",
+  marginBottom: "6px",
+  fontWeight: 500,
+};
+
+const errorStyle = {
+  color: "#e74c3c",
+  fontSize: "12px",
+  marginTop: "4px",
+};
+
+const passwordToggleStyle = {
+  position: "absolute",
+  right: "10px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  border: "none",
+  background: "transparent",
+  color: "#5f6f7f",
+  cursor: "pointer",
+  width: "32px",
+  height: "32px",
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+};
 
 export function SignupPage() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const {
     register,
@@ -53,30 +100,12 @@ export function SignupPage() {
     setError("");
     try {
       await authApi.signup(data);
-      // Navigate to OTP page with email in state
       navigate("/verify-otp", { state: { email: data.email } });
     } catch (err) {
-      setError(
-        err.response?.data?.detail || "Signup failed. Please try again.",
-      );
+      setError(err.response?.data?.detail || "Signup failed. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const inputStyle = (hasError) => ({
-    width: "100%",
-    padding: "10px 14px",
-    border: `1px solid ${hasError ? "#e74c3c" : "#ddd"}`,
-    borderRadius: "6px",
-    fontSize: "14px",
-    boxSizing: "border-box",
-  });
-
-  const errorStyle = {
-    color: "#e74c3c",
-    fontSize: "12px",
-    marginTop: "4px",
   };
 
   return (
@@ -100,16 +129,14 @@ export function SignupPage() {
           maxWidth: "480px",
         }}
       >
-        <h1
-          style={{ color: "#1a3c5e", marginBottom: "8px", textAlign: "center" }}
-        >
+        <h1 style={{ color: "#1a3c5e", marginBottom: "8px", textAlign: "center" }}>
           Create Account
         </h1>
         <p style={{ color: "#666", textAlign: "center", marginBottom: "32px" }}>
           Join POSH Training Platform
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div
             style={{
               display: "grid",
@@ -118,109 +145,172 @@ export function SignupPage() {
             }}
           >
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: 500,
-                }}
-              >
+              <label htmlFor="first_name" style={labelStyle}>
                 First Name *
               </label>
               <input
+                id="first_name"
+                autoComplete="given-name"
+                aria-invalid={!!errors.first_name}
+                aria-describedby={errors.first_name ? "first_name_error" : undefined}
                 {...register("first_name")}
-                style={inputStyle(!!errors.first_name)}
+                style={authInputStyle(!!errors.first_name)}
               />
               {errors.first_name && (
-                <p style={errorStyle}>{errors.first_name.message}</p>
+                <p id="first_name_error" style={errorStyle}>
+                  {errors.first_name.message}
+                </p>
               )}
             </div>
+
             <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "6px",
-                  fontWeight: 500,
-                }}
-              >
-                Last Name
+              <label htmlFor="last_name" style={labelStyle}>
+                Last Name *
               </label>
               <input
+                id="last_name"
+                autoComplete="family-name"
+                aria-invalid={!!errors.last_name}
+                aria-describedby={errors.last_name ? "last_name_error" : undefined}
                 {...register("last_name")}
-                style={inputStyle(!!errors.last_name)}
+                style={authInputStyle(!!errors.last_name)}
               />
               {errors.last_name && (
-                <p style={errorStyle}>{errors.last_name.message}</p>
+                <p id="last_name_error" style={errorStyle}>
+                  {errors.last_name.message}
+                </p>
               )}
             </div>
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label htmlFor="email" style={labelStyle}>
               Email Address *
             </label>
             <input
+              id="email"
               type="email"
+              autoComplete="email"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? "email_error" : undefined}
               {...register("email")}
-              style={inputStyle(!!errors.email)}
+              style={authInputStyle(!!errors.email)}
             />
-            {errors.email && <p style={errorStyle}>{errors.email.message}</p>}
+            {errors.email && (
+              <p id="email_error" style={errorStyle}>
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label htmlFor="mobile" style={labelStyle}>
               Mobile Number *
             </label>
             <input
+              id="mobile"
               type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              aria-invalid={!!errors.mobile}
+              aria-describedby={errors.mobile ? "mobile_error" : undefined}
               {...register("mobile")}
               placeholder="10 digit number"
-              style={inputStyle(!!errors.mobile)}
+              style={authInputStyle(!!errors.mobile)}
             />
-            {errors.mobile && <p style={errorStyle}>{errors.mobile.message}</p>}
+            {errors.mobile && (
+              <p id="mobile_error" style={errorStyle}>
+                {errors.mobile.message}
+              </p>
+            )}
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label htmlFor="password" style={labelStyle}>
               Password *
             </label>
-            <input
-              type="password"
-              {...register("password")}
-              style={inputStyle(!!errors.password)}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                aria-invalid={!!errors.password}
+                aria-describedby={
+                  errors.password ? "password_error password_help" : "password_help"
+                }
+                {...register("password")}
+                style={{ ...authInputStyle(!!errors.password), paddingRight: "46px" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                style={passwordToggleStyle}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+              </button>
+            </div>
             {errors.password && (
-              <p style={errorStyle}>{errors.password.message}</p>
+              <p id="password_error" style={errorStyle}>
+                {errors.password.message}
+              </p>
             )}
-            <p style={{ fontSize: "11px", color: "#999", marginTop: "4px" }}>
-              8–15 characters, uppercase, lowercase, number, special character
+            <p
+              id="password_help"
+              style={{ fontSize: "11px", color: "#999", marginTop: "4px" }}
+            >
+              8-15 characters, uppercase, lowercase, number, special character
             </p>
           </div>
 
           <div style={{ marginTop: "16px" }}>
-            <label
-              style={{ display: "block", marginBottom: "6px", fontWeight: 500 }}
-            >
+            <label htmlFor="confirm_password" style={labelStyle}>
               Confirm Password *
             </label>
-            <input
-              type="password"
-              {...register("confirm_password")}
-              style={inputStyle(!!errors.confirm_password)}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                id="confirm_password"
+                type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
+                aria-invalid={!!errors.confirm_password}
+                aria-describedby={
+                  errors.confirm_password ? "confirm_password_error" : undefined
+                }
+                {...register("confirm_password")}
+                style={{
+                  ...authInputStyle(!!errors.confirm_password),
+                  paddingRight: "46px",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((value) => !value)}
+                style={passwordToggleStyle}
+                aria-label={
+                  showConfirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
+                title={
+                  showConfirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
+              >
+                {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+              </button>
+            </div>
             {errors.confirm_password && (
-              <p style={errorStyle}>{errors.confirm_password.message}</p>
+              <p id="confirm_password_error" style={errorStyle}>
+                {errors.confirm_password.message}
+              </p>
             )}
           </div>
 
           {error && (
             <div
+              role="alert"
               style={{
                 background: "#fdf0f0",
                 border: "1px solid #e74c3c",
@@ -263,6 +353,11 @@ export function SignupPage() {
             </Link>
           </span>
         </div>
+        <LoadingOverlay
+          show={loading}
+          title="Creating account"
+          message="Saving your account and sending the OTP email."
+        />
       </div>
     </div>
   );

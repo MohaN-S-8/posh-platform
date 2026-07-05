@@ -4,11 +4,12 @@ from typing import Optional
 
 import magic  # python-magic for real MIME type detection
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import generate_presigned_url, upload_file
 from app.models.training import CourseAssignment, TrainingHistory
+from app.models.user import UserMaster
 from app.models.video import VideoMaster
 from app.schemas.video import VideoCreate
 
@@ -95,14 +96,44 @@ class VideoService:
                 detail="Video not found or not yet published.",
             )
 
-        # Verify user is assigned this course
-        assigned = await db.execute(
-            select(CourseAssignment).where(
-                CourseAssignment.video_id == video_id,
-                CourseAssignment.company_id == company_id,
+        user_result = await db.execute(
+            select(UserMaster).where(
+                UserMaster.user_id == user_id,
+                UserMaster.company_id == company_id,
+                UserMaster.status == "Active",
+                UserMaster.is_deleted == "N",
             )
         )
-        if not assigned.scalar_one_or_none():
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        assignment_matches = [
+            and_(
+                CourseAssignment.assign_type == "Individual",
+                CourseAssignment.assigned_to_user_id == user_id,
+            ),
+            CourseAssignment.assign_type == "Company-Wide",
+        ]
+        if user.department:
+            assignment_matches.append(
+                and_(
+                    CourseAssignment.assign_type == "Department",
+                    CourseAssignment.assigned_to_department == user.department,
+                )
+            )
+
+        # Verify this specific user is assigned this course.
+        assigned = await db.execute(
+            select(CourseAssignment.id)
+            .where(
+                CourseAssignment.video_id == video_id,
+                CourseAssignment.company_id == company_id,
+                or_(*assignment_matches),
+            )
+            .limit(1)
+        )
+        if assigned.scalar_one_or_none() is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not assigned to this course.",
@@ -121,19 +152,31 @@ class VideoService:
         history = history_result.scalar_one_or_none()
 
         if not history:
+            from datetime import datetime, timezone
+
             history = TrainingHistory(
                 user_id=user_id,
                 video_id=video_id,
                 company_id=company_id,
                 total_seconds=(video.duration_minutes or 0) * 60,
                 status="In Progress",
+                started_at=datetime.now(timezone.utc),
             )
             db.add(history)
             await db.commit()
 
         return {
             "stream_url": signed_url,
-            "resume_position": history.last_watched_position if history else 0,
+            "resume_position": (
+                max(
+                    int(history.last_watched_position or 0),
+                    int(history.furthest_position or 0),
+                )
+                if history
+                else 0
+            ),
+            "furthest_position": int(history.furthest_position or 0) if history else 0,
+            "watched_seconds": int(history.watched_seconds or 0) if history else 0,
             "completion_percent": float(history.completion_percent) if history else 0,
         }
 
@@ -147,7 +190,8 @@ class VideoService:
     ) -> dict:
         """
         Update video watch progress.
-        Enforces no-fast-forward: current_position cannot exceed furthest_position + 30s.
+        Enforces mandatory viewing. Resume position follows the player's current
+        timestamp, but completion is based on accumulated watched time.
         """
         result = await db.execute(
             select(TrainingHistory).where(
@@ -160,26 +204,57 @@ class VideoService:
         if not history:
             raise HTTPException(404, "No training history found. Start the video first.")
 
-        # No-fast-forward enforcement:
-        # Allow up to 30 seconds ahead of furthest watched position (buffer for network)
-        max_allowed = (history.furthest_position or 0) + 30
-        if current_position > max_allowed:
+        current_position = max(0, int(current_position or 0))
+        total_duration = max(0, int(total_duration or history.total_seconds or 0))
+        previous_last = int(history.last_watched_position or 0)
+        previous_furthest = int(history.furthest_position or 0)
+        previous_watched = int(history.watched_seconds or 0)
+
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        last_progress_at = history.updated_date or history.started_at
+        if last_progress_at and last_progress_at.tzinfo is None:
+            last_progress_at = last_progress_at.replace(tzinfo=timezone.utc)
+        elapsed_since_save = (
+            max(0, int((now - last_progress_at).total_seconds())) if last_progress_at else 0
+        )
+
+        # Player saves every 10s. A small tolerance avoids false positives from
+        # timer drift/buffering while still blocking jump-to-end completion.
+        allowed_forward_jump = 15
+        jumped_beyond_watched_range = current_position > previous_furthest + allowed_forward_jump
+        jumped_beyond_last_tick = current_position > previous_last + allowed_forward_jump
+        if jumped_beyond_watched_range and jumped_beyond_last_tick:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Fast-forward is not allowed. Please watch the video in sequence.",
+                detail="Skipping required portions is not allowed. Please watch the video in sequence.",
             )
 
-        # Update progress
-        history.last_watched_position = current_position
-        history.watched_seconds = current_position
+        forward_delta = max(0, current_position - previous_last)
+        if current_position <= previous_furthest:
+            forward_delta = 0
+        elif forward_delta > allowed_forward_jump:
+            forward_delta = allowed_forward_jump
 
-        if current_position > (history.furthest_position or 0):
+        if forward_delta > 0 and last_progress_at:
+            forward_delta = min(forward_delta, elapsed_since_save + 2)
+
+        watched_seconds = previous_watched + forward_delta
+        if total_duration > 0:
+            watched_seconds = min(watched_seconds, total_duration)
+            history.total_seconds = total_duration
+
+        if current_position >= previous_last or current_position >= previous_furthest - 5:
+            history.last_watched_position = current_position
+        history.watched_seconds = watched_seconds
+
+        if current_position > previous_furthest:
             history.furthest_position = current_position
 
-        # Calculate completion %
         if total_duration > 0:
-            percent = (current_position / total_duration) * 100
-            history.completion_percent = min(percent, 100)
+            percent = (watched_seconds / total_duration) * 100
+            history.completion_percent = round(min(percent, 100), 2)
 
         # Mark as completed when >= 95% watched
         if history.completion_percent >= 95 and history.status != "Completed":
@@ -192,6 +267,9 @@ class VideoService:
 
         return {
             "completion_percent": float(history.completion_percent),
+            "watched_seconds": int(history.watched_seconds or 0),
+            "furthest_position": int(history.furthest_position or 0),
+            "last_watched_position": int(history.last_watched_position or 0),
             "status": history.status,
             "assessment_unlocked": history.status == "Completed",
         }

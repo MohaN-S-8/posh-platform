@@ -45,7 +45,8 @@ async def get_user(
     current_user=Depends(require_roles([1, 2, 3])),
 ):
     """Get a user by ID."""
-    return await user_service.get_by_id(db, user_id)
+    company_id = current_user.company_id if current_user.role_id in [2, 3] else None
+    return await user_service.get_by_id(db, user_id, company_id)
 
 
 @router.put("/{user_id}", response_model=UserResponse)
@@ -56,7 +57,8 @@ async def update_user(
     current_user=Depends(require_roles([1, 2])),
 ):
     """Update user details."""
-    return await user_service.update(db, user_id, data)
+    company_id = current_user.company_id if current_user.role_id == 2 else None
+    return await user_service.update(db, user_id, data, company_id)
 
 
 @router.patch("/{user_id}/status")
@@ -71,7 +73,8 @@ async def update_user_status(
         from fastapi import HTTPException
 
         raise HTTPException(400, "Status must be 'Active' or 'Inactive'")
-    return await user_service.set_status(db, user_id, status)
+    company_id = current_user.company_id if current_user.role_id == 2 else None
+    return await user_service.set_status(db, user_id, status, company_id)
 
 
 @router.post("/{user_id}/reset-password")
@@ -82,7 +85,8 @@ async def admin_reset_password(
     current_user=Depends(require_roles([1, 2])),
 ):
     """Admin resets a user's password."""
-    return await user_service.reset_password(db, user_id, data.new_password)
+    company_id = current_user.company_id if current_user.role_id == 2 else None
+    return await user_service.reset_password(db, user_id, data.new_password, company_id)
 
 
 @router.delete("/{user_id}")

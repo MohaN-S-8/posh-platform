@@ -100,7 +100,7 @@ class AuthService:
             update(UserMaster).where(UserMaster.email == email.lower()).values(status="Active")
         )
         await db.commit()
-        return {"message": "Email verified successfully. You can now log in."}
+        return {"message": "Registration completed successfully."}
 
     async def login(self, db: AsyncSession, data: LoginRequest, ip_address: str) -> dict:
         result = await db.execute(select(UserMaster).where(UserMaster.email == data.email.lower()))
@@ -122,6 +122,8 @@ class AuthService:
             minutes_left = (
                 int((lockout.locked_until - datetime.now(timezone.utc)).total_seconds() / 60) + 1
             )
+            await self._log_attempt(db, user.user_id, data.email, ip_address, False)
+            await db.commit()
             raise HTTPException(
                 status_code=status.HTTP_423_LOCKED,
                 detail=f"Account locked. Try again in {minutes_left} minutes.",
@@ -136,6 +138,8 @@ class AuthService:
             )
 
         if user.status != "Active":
+            await self._log_attempt(db, user.user_id, data.email, ip_address, False)
+            await db.commit()
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account is inactive. Contact your administrator.",

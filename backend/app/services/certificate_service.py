@@ -1,4 +1,5 @@
 import io
+import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -12,13 +13,13 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.storage import generate_presigned_url, upload_file
 from app.models.certificate import Certificate, CertificateTemplate
 from app.models.user import UserMaster
 from app.models.video import VideoMaster
 
 CERT_BUCKET = "posh-certificates"
-BASE_VERIFY_URL = "http://localhost:8000/api/v1/certificates/verify"
 
 
 class CertificateService:
@@ -39,27 +40,48 @@ class CertificateService:
         5. Save record to DB
         """
 
-        # 1. Fetch user and video details
-        user_result = await db.execute(select(UserMaster).where(UserMaster.user_id == user_id))
+        # 1. Fetch user and video details scoped to the same company
+        user_result = await db.execute(
+            select(UserMaster).where(
+                UserMaster.user_id == user_id,
+                UserMaster.company_id == company_id,
+                UserMaster.status == "Active",
+                UserMaster.is_deleted == "N",
+            )
+        )
         user = user_result.scalar_one_or_none()
         if not user:
             raise HTTPException(404, "User not found")
 
-        video_result = await db.execute(select(VideoMaster).where(VideoMaster.video_id == video_id))
+        video_result = await db.execute(
+            select(VideoMaster).where(
+                VideoMaster.video_id == video_id,
+                VideoMaster.company_id == company_id,
+            )
+        )
         video = video_result.scalar_one_or_none()
         if not video:
             raise HTTPException(404, "Video not found")
 
+        existing_result = await db.execute(
+            select(Certificate).where(
+                Certificate.user_id == user_id,
+                Certificate.video_id == video_id,
+                Certificate.company_id == company_id,
+                Certificate.status == "Valid",
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            return existing
+
         # 2. Generate unique certificate number
         year = datetime.now().year
-        count_result = await db.execute(
-            select(func.count()).where(Certificate.company_id == company_id)
-        )
-        count = (count_result.scalar() or 0) + 1
-        cert_number = f"POSH-{year}-{str(count).zfill(6)}"  # e.g. POSH-2026-000123
+        cert_number = f"POSH-{year}-{uuid.uuid4().hex[:10].upper()}"
 
         # 3. Generate QR code
-        verify_url = f"{BASE_VERIFY_URL}/{cert_number}"
+        verify_base_url = settings.PUBLIC_APP_URL.rstrip("/")
+        verify_url = f"{verify_base_url}/api/v1/certificates/verify/{cert_number}"
         qr_bytes = self._generate_qr(verify_url)
         qr_path = f"certificates/{company_id}/qr/{cert_number}.png"
         upload_file(qr_bytes, CERT_BUCKET, qr_path, "image/png")
@@ -78,6 +100,7 @@ class CertificateService:
         # 5. Save to DB
         certificate = Certificate(
             user_id=user_id,
+            video_id=video_id,
             company_id=company_id,
             certificate_number=cert_number,
             course_name=video.title,
@@ -195,7 +218,7 @@ class CertificateService:
         story.append(Paragraph(f"Certificate Number: {cert_number}", small_style))
         story.append(
             Paragraph(
-                f"Verify at: {BASE_VERIFY_URL}/{cert_number}",
+                f"Verify at: {settings.PUBLIC_APP_URL.rstrip('/')}/api/v1/certificates/verify/{cert_number}",
                 small_style,
             )
         )
@@ -277,3 +300,58 @@ class CertificateService:
             )
         )
         return result.scalars().all()
+
+    async def list_templates(self, db, company_id: int) -> list:
+        result = await db.execute(
+            select(CertificateTemplate)
+            .where(CertificateTemplate.company_id == company_id)
+            .order_by(CertificateTemplate.created_date.desc())
+        )
+        return result.scalars().all()
+
+    async def create_template(self, db, data, company_id: int) -> CertificateTemplate:
+        template = CertificateTemplate(
+            template_name=data.template_name.strip(),
+            font_name=data.font_name or "Helvetica",
+            color_code=data.color_code or "#1a3c5e",
+            company_id=company_id,
+            status="Active",
+        )
+        db.add(template)
+        await db.commit()
+        await db.refresh(template)
+        return template
+
+    async def update_template(self, db, template_id: int, data, company_id: int):
+        result = await db.execute(
+            select(CertificateTemplate).where(
+                CertificateTemplate.template_id == template_id,
+                CertificateTemplate.company_id == company_id,
+            )
+        )
+        template = result.scalar_one_or_none()
+        if not template:
+            raise HTTPException(404, "Certificate template not found.")
+
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(template, field, value)
+        await db.commit()
+        await db.refresh(template)
+        return template
+
+    async def set_template_status(
+        self, db, template_id: int, new_status: str, company_id: int
+    ) -> dict:
+        result = await db.execute(
+            select(CertificateTemplate).where(
+                CertificateTemplate.template_id == template_id,
+                CertificateTemplate.company_id == company_id,
+            )
+        )
+        template = result.scalar_one_or_none()
+        if not template:
+            raise HTTPException(404, "Certificate template not found.")
+        template.status = new_status
+        await db.commit()
+        return {"message": f"Template {new_status.lower()} successfully."}
