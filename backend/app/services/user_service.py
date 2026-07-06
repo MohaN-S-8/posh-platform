@@ -14,10 +14,13 @@ class UserService:
         self,
         db: AsyncSession,
         company_id: Optional[int] = None,
+        role_ids: Optional[set[int]] = None,
     ) -> list:
         query = select(UserMaster).where(UserMaster.is_deleted == "N")
         if company_id:
             query = query.where(UserMaster.company_id == company_id)
+        if role_ids:
+            query = query.where(UserMaster.role_id.in_(role_ids))
         result = await db.execute(query)
         return result.scalars().all()
 
@@ -110,8 +113,10 @@ class UserService:
         await db.commit()
         return {"message": "Password reset successfully."}
 
-    async def delete(self, db: AsyncSession, user_id: int) -> dict:
-        user = await self.get_by_id(db, user_id)
+    async def delete(
+        self, db: AsyncSession, user_id: int, company_id: Optional[int] = None
+    ) -> dict:
+        user = await self.get_by_id(db, user_id, company_id)
         user.is_deleted = "Y"
         await db.commit()
         return {"message": "User deleted successfully."}

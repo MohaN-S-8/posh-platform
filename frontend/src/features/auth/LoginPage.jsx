@@ -56,6 +56,9 @@ const passwordToggleStyle = {
   padding: 0,
 };
 
+const showDevCredentials =
+  import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_CREDENTIALS === "true";
+
 export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -80,7 +83,7 @@ export function LoginPage() {
       const { access_token, user_id, role_id, company_id } = res.data;
       setAuth({ user_id, role_id, company_id }, access_token);
 
-      if (role_id === 1 || role_id === 2) navigate("/admin");
+      if (role_id === 1 || role_id === 2 || role_id === 5) navigate("/admin");
       else if (role_id === 3) navigate("/hr");
       else navigate("/employee");
     } catch (err) {
@@ -141,24 +144,26 @@ export function LoginPage() {
           Sign in to your account
         </p>
 
-        <div
-          style={{
-            background: "#eef4f8",
-            border: "1px solid #cdd9e2",
-            borderRadius: "8px",
-            padding: "12px 14px",
-            marginBottom: "24px",
-            fontSize: "13px",
-            color: "#17324d",
-            lineHeight: 1.5,
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: "4px" }}>
-            Default development logins
+        {showDevCredentials && (
+          <div
+            style={{
+              background: "#eef4f8",
+              border: "1px solid #cdd9e2",
+              borderRadius: "8px",
+              padding: "12px 14px",
+              marginBottom: "24px",
+              fontSize: "13px",
+              color: "#17324d",
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: "4px" }}>
+              Default development logins
+            </div>
+            <div>Admin: admin@posh.com / Admin@1234</div>
+            <div>HR: hr@posh.com / Admin@1234</div>
           </div>
-          <div>Admin: admin@posh.com / Admin@1234</div>
-          <div>HR: hr@posh.com / Admin@1234</div>
-        </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div style={{ marginBottom: "20px" }}>

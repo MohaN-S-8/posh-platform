@@ -1,12 +1,29 @@
 import AddIcon from "@mui/icons-material/Add";
 import KeyIcon from "@mui/icons-material/Key";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { useAuthStore } from "../../store/authStore";
 
-const ROLES = { 1: "Super Admin", 2: "Company Admin", 3: "HR", 4: "Employee" };
+const ROLES = {
+  1: "Super Admin",
+  2: "Admin",
+  3: "HR / IC",
+  4: "Employee",
+  5: "Client / Management",
+};
+
+const ROLE_CREATE_FLOW = {
+  1: [2],
+  2: [5],
+  5: [3],
+  3: [4],
+};
+
+function defaultRoleFor(user) {
+  return ROLE_CREATE_FLOW[user?.role_id]?.[0] || 4;
+}
 
 const inputStyle = {
   width: "100%",
@@ -33,6 +50,7 @@ const initialForm = {
 
 export function UserListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthStore();
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -45,8 +63,9 @@ export function UserListPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
-
-  const canCreateSuperAdmin = user?.role_id === 1;
+  const isHrRoute = location.pathname.startsWith("/hr/");
+  const dashboardPath = isHrRoute ? "/hr" : "/admin";
+  const pageTitle = isHrRoute ? "Employee Management" : "User Management";
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -60,7 +79,8 @@ export function UserListPage() {
       setCompanies(companyRes.data || []);
       setForm((current) => ({
         ...current,
-        company_id: user?.role_id === 2 ? user.company_id : current.company_id,
+        role_id: defaultRoleFor(user),
+        company_id: user?.role_id === 1 ? current.company_id : user?.company_id || "",
       }));
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to load users.");
@@ -78,10 +98,11 @@ export function UserListPage() {
 
   const roleOptions = useMemo(
     () =>
-      Object.entries(ROLES)
-        .map(([value, label]) => ({ value: Number(value), label }))
-        .filter((role) => canCreateSuperAdmin || role.value !== 1),
-    [canCreateSuperAdmin],
+      (ROLE_CREATE_FLOW[user?.role_id] || []).map((value) => ({
+        value,
+        label: ROLES[value],
+      })),
+    [user?.role_id],
   );
 
   const filtered = users.filter((u) =>
@@ -100,14 +121,14 @@ export function UserListPage() {
         ...form,
         email: form.email.trim().toLowerCase(),
         role_id: Number(form.role_id),
-        company_id: Number(user?.role_id === 2 ? user.company_id : form.company_id),
+        company_id: Number(user?.role_id === 1 ? form.company_id : user.company_id),
       };
       await apiClient.post("/users/", payload);
       setSuccess("User created successfully. Temporary password was emailed.");
       setForm({
         ...initialForm,
-        role_id: 4,
-        company_id: user?.role_id === 2 ? user.company_id : "",
+        role_id: defaultRoleFor(user),
+        company_id: user?.role_id === 1 ? "" : user?.company_id || "",
       });
       setShowCreate(false);
       await loadData();
@@ -165,7 +186,7 @@ export function UserListPage() {
         <div>
           <button
             type="button"
-            onClick={() => navigate("/admin")}
+            onClick={() => navigate(dashboardPath)}
             style={{
               background: "none",
               border: "none",
@@ -178,7 +199,7 @@ export function UserListPage() {
             Back to Dashboard
           </button>
           <h1 style={{ color: "#17324d", margin: 0, fontSize: "30px" }}>
-            User Management
+            {pageTitle}
           </h1>
         </div>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>

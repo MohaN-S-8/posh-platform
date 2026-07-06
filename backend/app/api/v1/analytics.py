@@ -62,10 +62,10 @@ async def analytics_overview(
 async def company_analytics(
     company_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles([1, 2])),
+    current_user=Depends(require_roles([1, 2, 5])),
 ):
     """Analytics for a specific company."""
-    if current_user.role_id == 2 and current_user.company_id != company_id:
+    if current_user.role_id != 1 and current_user.company_id != company_id:
         raise HTTPException(403, "You do not have permission to access this company.")
 
     # Employee counts

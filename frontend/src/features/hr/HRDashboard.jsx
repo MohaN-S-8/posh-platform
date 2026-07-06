@@ -134,12 +134,12 @@ export function HRDashboard() {
       icon: <DownloadIcon />,
       status: "Available",
     },
-    ...(user?.role_id === 1 || user?.role_id === 2
+    ...([1, 2, 3, 5].includes(user?.role_id)
       ? [
           {
             title: "Employee Management",
-            description: "Activate, deactivate, and update employees from Admin Users.",
-            path: "/admin/users",
+            description: "Create, activate, deactivate, and reset employee accounts.",
+            path: "/hr/users",
             icon: <GroupsIcon />,
             status: "Shared",
           },

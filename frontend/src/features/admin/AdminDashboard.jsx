@@ -99,6 +99,7 @@ export function AdminDashboard() {
       path: "/admin/companies",
       icon: <BusinessIcon />,
       status: "Available",
+      allowedRoles: [1],
     },
     {
       title: "User Management",
@@ -106,6 +107,15 @@ export function AdminDashboard() {
       path: "/admin/users",
       icon: <PeopleIcon />,
       status: "Available",
+      allowedRoles: [1, 2, 5],
+    },
+    {
+      title: "Owner Admin Setup",
+      description: "Direct-link company owner flow for creating Admin users.",
+      path: "/owner/admin-setup",
+      icon: <PeopleIcon />,
+      status: "Owner",
+      allowedRoles: [1],
     },
     {
       title: "Video Management",
@@ -113,6 +123,7 @@ export function AdminDashboard() {
       path: "/admin/videos",
       icon: <VideoLibraryIcon />,
       status: "Available",
+      allowedRoles: [1, 2, 5],
     },
     {
       title: "Certificate Module",
@@ -120,6 +131,7 @@ export function AdminDashboard() {
       path: "/admin/certificates",
       icon: <BadgeIcon />,
       status: "Available",
+      allowedRoles: [1, 2],
     },
     {
       title: "Analytics",
@@ -127,6 +139,7 @@ export function AdminDashboard() {
       path: null,
       icon: <AssessmentIcon />,
       status: "Dashboard",
+      allowedRoles: [1, 2, 5],
     },
     {
       title: "Audit Logs",
@@ -134,6 +147,7 @@ export function AdminDashboard() {
       path: "/admin/audit-logs",
       icon: <HistoryIcon />,
       status: "Available",
+      allowedRoles: [1, 2],
     },
     {
       title: "Reports",
@@ -141,6 +155,7 @@ export function AdminDashboard() {
       path: "/admin/reports",
       icon: <AssessmentIcon />,
       status: "Available",
+      allowedRoles: [1, 2, 5],
     },
     {
       title: "System Settings",
@@ -148,8 +163,13 @@ export function AdminDashboard() {
       path: "/admin/settings",
       icon: <SettingsIcon />,
       status: "Available",
+      allowedRoles: [1, 2],
     },
   ];
+
+  const visibleModules = modules.filter((module) =>
+    module.allowedRoles.includes(user?.role_id),
+  );
 
   return (
     <div style={{ padding: "32px", background: "#f6f8fb", minHeight: "100vh" }}>
@@ -165,7 +185,7 @@ export function AdminDashboard() {
       >
         <div>
           <h1 style={{ color: "#17324d", margin: 0, fontSize: "30px" }}>
-            Admin Portal
+            {user?.role_id === 5 ? "Client / Management Portal" : "Admin Portal"}
           </h1>
           <p style={{ color: "#64748b", margin: "6px 0 0" }}>
             Manage companies, users, videos, certificates, analytics, and platform controls.
@@ -248,7 +268,7 @@ export function AdminDashboard() {
             gap: "16px",
           }}
         >
-          {modules.map((module) => {
+          {visibleModules.map((module) => {
             const enabled = Boolean(module.path);
             return (
               <button

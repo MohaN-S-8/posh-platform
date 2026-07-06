@@ -21,7 +21,7 @@ from app.models.user import UserMaster
 from app.models.video import VideoMaster
 from app.schemas.hr import TrainingAssignRequest
 
-REQUIRED_COLUMNS = {"employee_id", "first_name", "email", "mobile", "role_id"}
+REQUIRED_COLUMNS = {"employee_id", "first_name", "email", "mobile"}
 
 
 class HRService:
@@ -92,7 +92,7 @@ class HRService:
             raise HTTPException(
                 status_code=400,
                 detail=f"Missing required columns: {', '.join(missing)}. "
-                f"Required: employee_id, first_name, email, mobile, role_id",
+                f"Required: employee_id, first_name, email, mobile",
             )
 
         # 4. Create batch record
@@ -141,8 +141,8 @@ class HRService:
             if not mobile.isdigit() or len(mobile) != 10:
                 row_errors.append("mobile must be exactly 10 digits")
 
-            if role_id not in [1, 2, 3, 4]:
-                row_errors.append("role_id must be 1, 2, 3, or 4")
+            if role_id != 4:
+                row_errors.append("bulk employee upload can only create Employee users")
 
             # ── CSV injection defense ──────────────────────────────────────
             # Prefix cells starting with =, +, -, @ with apostrophe

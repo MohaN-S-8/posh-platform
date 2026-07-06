@@ -3,13 +3,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_roles
 from app.db.session import get_db
-from app.schemas.company import CompanyCreate, CompanyResponse, CompanyUpdate
+from app.schemas.company import (
+    CompanyCreate,
+    CompanyLanguagePreference,
+    CompanyLanguageUpdate,
+    CompanyResponse,
+    CompanyUpdate,
+)
 from app.services.company_service import CompanyService
 
 router = APIRouter(prefix="/companies", tags=["Company Management"])
 company_service = CompanyService()
 
-# Role IDs: 1=Super Admin, 2=Company Admin, 3=HR, 4=Employee
+# Role IDs: 1=Super Admin, 2=Admin, 3=HR / IC, 4=Employee, 5=Client / Management
 ADMIN_ROLES = [1, 2]
 
 
@@ -55,6 +61,36 @@ async def update_company(
     if current_user.role_id == 2 and current_user.company_id != company_id:
         raise HTTPException(403, "You do not have permission to update this company.")
     return await company_service.update(db, company_id, data)
+
+
+@router.get("/{company_id}/languages", response_model=list[CompanyLanguagePreference])
+async def get_company_languages(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_roles(ADMIN_ROLES)),
+):
+    """Get enabled language preferences for a company."""
+    if current_user.role_id == 2 and current_user.company_id != company_id:
+        raise HTTPException(403, "You do not have permission to access this company.")
+    return await company_service.get_language_preferences(db, company_id)
+
+
+@router.put("/{company_id}/languages", response_model=list[CompanyLanguagePreference])
+async def update_company_languages(
+    company_id: int,
+    data: CompanyLanguageUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_roles(ADMIN_ROLES)),
+):
+    """Configure a company's training languages and default language."""
+    if current_user.role_id == 2 and current_user.company_id != company_id:
+        raise HTTPException(403, "You do not have permission to update this company.")
+    return await company_service.update_language_preferences(
+        db,
+        company_id,
+        data.language_ids,
+        data.default_language_id,
+    )
 
 
 @router.patch("/{company_id}/status")

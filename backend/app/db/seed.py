@@ -24,12 +24,14 @@ async def seed():
         await db.execute(
             text(
                 """
-                INSERT IGNORE INTO role_master (role_id, role_name)
+                INSERT INTO role_master (role_id, role_name)
                 VALUES
                     (1, 'Super Admin'),
-                    (2, 'Company Admin'),
-                    (3, 'HR'),
-                    (4, 'Employee')
+                    (2, 'Admin'),
+                    (3, 'HR / IC'),
+                    (4, 'Employee'),
+                    (5, 'Client / Management')
+                ON DUPLICATE KEY UPDATE role_name = VALUES(role_name)
             """
             )
         )

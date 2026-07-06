@@ -13,6 +13,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.auth import AccountLockout, LoginAttempts, OTPVerification, RefreshTokens
+from app.models.company import CompanyMaster
 from app.models.user import UserMaster
 from app.schemas.auth import LoginRequest, SignupRequest
 
@@ -145,6 +146,21 @@ class AuthService:
                 detail="Your account is inactive. Contact your administrator.",
             )
 
+        company_result = await db.execute(
+            select(CompanyMaster).where(
+                CompanyMaster.company_id == user.company_id,
+                CompanyMaster.status == "Active",
+                CompanyMaster.is_deleted == "N",
+            )
+        )
+        if not company_result.scalar_one_or_none():
+            await self._log_attempt(db, user.user_id, data.email, ip_address, False)
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your company is inactive. Contact your administrator.",
+            )
+
         if lockout:
             lockout.failed_attempts = 0
             lockout.locked_until = None
@@ -194,6 +210,21 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account is inactive. Contact your administrator.",
+            )
+
+        company_result = await db.execute(
+            select(CompanyMaster).where(
+                CompanyMaster.company_id == user.company_id,
+                CompanyMaster.status == "Active",
+                CompanyMaster.is_deleted == "N",
+            )
+        )
+        if not company_result.scalar_one_or_none():
+            await self._log_attempt(db, user.user_id, user.email, ip_address, False)
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your company is inactive. Contact your administrator.",
             )
 
         access_token = create_access_token(
@@ -291,6 +322,18 @@ class AuthService:
             select(UserMaster).where(UserMaster.user_id == token_record.user_id)
         )
         user = user_result.scalar_one()
+        company_result = await db.execute(
+            select(CompanyMaster).where(
+                CompanyMaster.company_id == user.company_id,
+                CompanyMaster.status == "Active",
+                CompanyMaster.is_deleted == "N",
+            )
+        )
+        if not company_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your company is inactive. Contact your administrator.",
+            )
 
         access_token = create_access_token(
             {

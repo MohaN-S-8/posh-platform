@@ -11,8 +11,6 @@ from app.services.hr_service import HRService
 router = APIRouter(prefix="/hr", tags=["HR Portal"])
 hr_service = HRService()
 
-HR_ROLES = [1, 2, 3]  # Super Admin, Company Admin, HR
-
 
 @router.get("/employees")
 async def list_assignable_employees(
@@ -34,7 +32,7 @@ async def bulk_upload_employees(
     Upload Excel or CSV file to create employees in bulk.
     Returns success count and per-row error details.
     Supported formats: .xlsx, .xls, .csv
-    Required columns: employee_id, first_name, email, mobile, role_id
+    Required columns: employee_id, first_name, email, mobile
     """
     result = await hr_service.bulk_upload_employees(
         db, file, current_user.company_id, current_user.user_id

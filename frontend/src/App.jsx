@@ -11,6 +11,8 @@ import { ForgotPasswordPage } from "./features/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./features/auth/ResetPasswordPage";
 import { UnauthorizedPage } from "./features/auth/UnauthorizedPage";
 import { ChangePasswordPage } from "./features/auth/ChangePasswordPage";
+import { EntraCallbackPage } from "./features/auth/EntraCallbackPage";
+import { OwnerAdminSetupPage } from "./features/auth/OwnerAdminSetupPage";
 
 // Admin portal
 import { AdminDashboard } from "./features/admin/AdminDashboard";
@@ -48,6 +50,7 @@ function App() {
         <Route path="/verify-otp" element={<OTPPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/sso/entra/callback" element={<EntraCallbackPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route
           path="/change-password"
@@ -57,13 +60,43 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/owner/admin-setup"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[1]}>
+                <OwnerAdminSetupPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/company-owner-setup"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[1]}>
+                <OwnerAdminSetupPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/owner-setup"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[1]}>
+                <OwnerAdminSetupPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        {/* Admin portal — role 1 or 2 only */}
+        {/* Admin / management portal */}
         <Route
           path="/admin"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2]}>
+              <RoleRoute allowedRoles={[1, 2, 5]}>
                 <AdminDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -83,7 +116,7 @@ function App() {
           path="/admin/users"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <UserListPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -93,7 +126,7 @@ function App() {
           path="/admin/videos"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <VideoListPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -123,7 +156,7 @@ function App() {
           path="/admin/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <AdminReportsPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -140,12 +173,12 @@ function App() {
           }
         />
 
-        {/* HR portal — role 1, 2, or 3 */}
+        {/* HR / IC portal */}
         <Route
           path="/hr"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2, 3]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <HRDashboard />
               </RoleRoute>
             </ProtectedRoute>
@@ -155,8 +188,18 @@ function App() {
           path="/hr/upload"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2, 3]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <BulkUploadPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/users"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
+                <UserListPage />
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -165,7 +208,7 @@ function App() {
           path="/hr/assign"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2, 3]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <TrainingAssignPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -175,7 +218,7 @@ function App() {
           path="/hr/compliance"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2, 3]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <CompliancePage />
               </RoleRoute>
             </ProtectedRoute>
@@ -185,7 +228,7 @@ function App() {
           path="/hr/reports"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[1, 2, 3]}>
+              <RoleRoute allowedRoles={[1, 2, 3, 5]}>
                 <HRReportsPage />
               </RoleRoute>
             </ProtectedRoute>

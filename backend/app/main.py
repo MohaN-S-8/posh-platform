@@ -135,9 +135,10 @@ async def run_seed_on_startup():
                 INSERT INTO role_master (role_id, role_name)
                 VALUES
                     (1, 'Super Admin'),
-                    (2, 'Company Admin'),
-                    (3, 'HR'),
-                    (4, 'Employee')
+                    (2, 'Admin'),
+                    (3, 'HR / IC'),
+                    (4, 'Employee'),
+                    (5, 'Client / Management')
                 ON DUPLICATE KEY UPDATE role_name = VALUES(role_name)
                 """
             )
@@ -288,8 +289,10 @@ async def run_seed_on_startup():
                 SELECT 1, permission_id FROM permission_master
                 UNION SELECT 2, permission_id FROM permission_master
                 WHERE permission_key IN ('users.manage','videos.manage','certificates.manage','reports.view','training.assign')
+                UNION SELECT 5, permission_id FROM permission_master
+                WHERE permission_key IN ('users.manage','videos.manage','reports.view','training.assign')
                 UNION SELECT 3, permission_id FROM permission_master
-                WHERE permission_key IN ('reports.view','training.assign')
+                WHERE permission_key IN ('users.manage','videos.manage','reports.view','training.assign')
                 UNION SELECT 4, permission_id FROM permission_master
                 WHERE permission_key IN ('courses.watch')
                 """
