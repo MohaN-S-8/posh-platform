@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
+import { apiErrorMessage } from "../../api/errors";
 
 const emptyForm = {
   company_code: "",
@@ -20,13 +21,18 @@ const fields = [
   { label: "Company Code", key: "company_code", required: true, createOnly: true },
   { label: "Company Name", key: "company_name", required: true },
   { label: "Industry Type", key: "industry_type" },
-  { label: "Website", key: "website" },
+  {
+    label: "Website",
+    key: "website",
+    type: "url",
+    placeholder: "https://example.com",
+  },
   { label: "Registration Number", key: "registration_number" },
   { label: "GST Number", key: "gst_number" },
-  { label: "Employee Strength", key: "employee_strength", type: "number" },
+  { label: "Employee Strength", key: "employee_strength", type: "number", min: 1 },
   { label: "Contact Person", key: "contact_person" },
   { label: "Contact Email", key: "contact_email", type: "email" },
-  { label: "Contact Mobile", key: "contact_mobile" },
+  { label: "Contact Mobile", key: "contact_mobile", pattern: "\\d{10}", maxLength: 10 },
 ];
 
 export function CompanyListPage() {
@@ -48,8 +54,8 @@ export function CompanyListPage() {
     try {
       const res = await apiClient.get("/companies/");
       setCompanies(res.data || []);
-    } catch {
-      setError("Failed to load companies.");
+    } catch (err) {
+      setError(apiErrorMessage(err, "Failed to load companies."));
     } finally {
       setLoading(false);
     }
@@ -116,7 +122,7 @@ export function CompanyListPage() {
       setForm(emptyForm);
       await fetchCompanies();
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to save company.");
+      setError(apiErrorMessage(err, "Failed to save company."));
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +144,7 @@ export function CompanyListPage() {
       setLanguageRows(res.data || []);
       setSuccess("Language preferences updated.");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to update language preferences.");
+      setError(apiErrorMessage(err, "Failed to update language preferences."));
     } finally {
       setSubmitting(false);
     }
@@ -152,8 +158,8 @@ export function CompanyListPage() {
       await apiClient.patch(`/companies/${company.company_id}/status?status=${newStatus}`);
       setSuccess(`Company ${newStatus.toLowerCase()}.`);
       await fetchCompanies();
-    } catch {
-      setError("Failed to update status.");
+    } catch (err) {
+      setError(apiErrorMessage(err, "Failed to update status."));
     }
   };
 
@@ -183,18 +189,33 @@ export function CompanyListPage() {
             <div style={formGridStyle}>
               {fields
                 .filter((field) => !editingCompany || !field.createOnly)
-                .map(({ label, key, type = "text", required }) => (
+                .map(
+                  ({
+                    label,
+                    key,
+                    type = "text",
+                    required,
+                    pattern,
+                    maxLength,
+                    min,
+                    placeholder,
+                  }) => (
                   <label key={key} style={labelStyle}>
                     {label}
                     <input
                       type={type}
                       required={required}
+                      pattern={pattern}
+                      maxLength={maxLength}
+                      min={min}
+                      placeholder={placeholder}
                       value={form[key] || ""}
                       onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                       style={inputStyle}
                     />
                   </label>
-                ))}
+                  ),
+                )}
               <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>
                 Address
                 <textarea

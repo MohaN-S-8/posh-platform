@@ -82,6 +82,13 @@ def generate_presigned_url(bucket: str, object_key: str, expiry_seconds: int = 3
     )
 
 
+def read_file(bucket: str, object_key: str) -> bytes:
+    """Read an object from MinIO/S3 through the internal service endpoint."""
+    client = get_storage_client()
+    response = client.get_object(Bucket=bucket, Key=object_key)
+    return response["Body"].read()
+
+
 def delete_file(bucket: str, object_key: str) -> None:
     """Delete a file from storage."""
     client = get_storage_client()

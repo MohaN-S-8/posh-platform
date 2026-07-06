@@ -91,6 +91,36 @@ class UserService:
     ) -> UserMaster:
         user = await self.get_by_id(db, user_id, company_id)
         update_data = data.model_dump(exclude_unset=True)
+        if "email" in update_data and update_data["email"] != user.email:
+            existing = await db.execute(
+                select(UserMaster).where(
+                    UserMaster.email == update_data["email"],
+                    UserMaster.user_id != user_id,
+                    UserMaster.is_deleted == "N",
+                )
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered.",
+                )
+            update_data["username"] = update_data["email"]
+
+        if "employee_id" in update_data and update_data["employee_id"] != user.employee_id:
+            existing = await db.execute(
+                select(UserMaster).where(
+                    UserMaster.employee_id == update_data["employee_id"],
+                    UserMaster.company_id == user.company_id,
+                    UserMaster.user_id != user_id,
+                    UserMaster.is_deleted == "N",
+                )
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Employee ID already exists for this company.",
+                )
+
         for field, value in update_data.items():
             setattr(user, field, value)
         await db.commit()

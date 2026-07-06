@@ -3,21 +3,20 @@ import KeyIcon from "@mui/icons-material/Key";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
+import { apiErrorMessage } from "../../api/errors";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { useAuthStore } from "../../store/authStore";
 
 const ROLES = {
   1: "Super Admin",
-  2: "Admin",
+  2: "Company Admin",
   3: "HR / IC",
   4: "Employee",
-  5: "Client / Management",
 };
 
 const ROLE_CREATE_FLOW = {
   1: [2],
-  2: [5],
-  5: [3],
+  2: [3],
   3: [4],
 };
 
@@ -55,6 +54,8 @@ export function UserListPage() {
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [form, setForm] = useState(initialForm);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState(initialForm);
   const [passwordForm, setPasswordForm] = useState({ userId: "", password: "" });
   const [showCreate, setShowCreate] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -83,7 +84,7 @@ export function UserListPage() {
         company_id: user?.role_id === 1 ? current.company_id : user?.company_id || "",
       }));
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load users.");
+      setError(apiErrorMessage(err, "Failed to load users."));
     } finally {
       setLoading(false);
     }
@@ -111,6 +112,9 @@ export function UserListPage() {
       .includes(search.trim().toLowerCase()),
   );
 
+  const canManageUser = (target) =>
+    (ROLE_CREATE_FLOW[user?.role_id] || []).includes(target.role_id);
+
   const submitCreate = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -133,7 +137,7 @@ export function UserListPage() {
       setShowCreate(false);
       await loadData();
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to create user.");
+      setError(apiErrorMessage(err, "Failed to create user."));
     } finally {
       setSaving(false);
     }
@@ -152,7 +156,49 @@ export function UserListPage() {
       setPasswordForm({ userId: "", password: "" });
       setShowPassword(false);
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to change password.");
+      setError(apiErrorMessage(err, "Failed to change password."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEdit = (target) => {
+    setEditingUser(target);
+    setEditForm({
+      employee_id: target.employee_id || "",
+      first_name: target.first_name || "",
+      last_name: target.last_name || "",
+      email: target.email || "",
+      mobile: target.mobile || "",
+      department: target.department || "",
+      designation: target.designation || "",
+      role_id: target.role_id,
+      company_id: target.company_id || "",
+    });
+  };
+
+  const submitEdit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await apiClient.put(`/users/${editingUser.user_id}`, {
+        employee_id: editForm.employee_id,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        email: editForm.email.trim().toLowerCase(),
+        mobile: editForm.mobile,
+        department: editForm.department,
+        designation: editForm.designation,
+        role_id: Number(editForm.role_id),
+      });
+      setSuccess("User updated successfully.");
+      setEditingUser(null);
+      await loadData();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Failed to update user."));
     } finally {
       setSaving(false);
     }
@@ -167,7 +213,23 @@ export function UserListPage() {
       setSuccess(`User ${newStatus.toLowerCase()} successfully.`);
       await loadData();
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to update user status.");
+      setError(apiErrorMessage(err, "Failed to update user status."));
+    }
+  };
+
+  const deleteUser = async (target) => {
+    const confirmed = window.confirm(
+      `Delete ${target.first_name} ${target.last_name || ""}? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setError("");
+    setSuccess("");
+    try {
+      await apiClient.delete(`/users/${target.user_id}`);
+      setSuccess("User deleted successfully.");
+      await loadData();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Failed to delete user."));
     }
   };
 
@@ -239,7 +301,16 @@ export function UserListPage() {
               <label key={field} style={labelStyle}>
                 {label}
                 <input
-                  required={["employee_id", "first_name", "last_name", "email", "mobile"].includes(field)}
+                  required={[
+                    "employee_id",
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "mobile",
+                  ].includes(field)}
+                  type={field === "email" ? "email" : "text"}
+                  pattern={field === "mobile" ? "\\d{10}" : undefined}
+                  maxLength={field === "mobile" ? 10 : undefined}
                   value={form[field]}
                   onChange={(e) => setForm({ ...form, [field]: e.target.value })}
                   style={inputStyle}
@@ -328,6 +399,64 @@ export function UserListPage() {
         </form>
       )}
 
+      {editingUser && (
+        <form onSubmit={submitEdit} style={panelStyle}>
+          <h2 style={panelTitleStyle}>Edit User</h2>
+          <div style={formGridStyle}>
+            {[
+              ["employee_id", "Employee ID"],
+              ["first_name", "First Name"],
+              ["last_name", "Last Name"],
+              ["email", "Email"],
+              ["mobile", "Mobile"],
+              ["department", "Department"],
+              ["designation", "Designation"],
+            ].map(([field, label]) => (
+              <label key={field} style={labelStyle}>
+                {label}
+                <input
+                  required={["employee_id", "first_name", "last_name", "email", "mobile"].includes(field)}
+                  type={field === "email" ? "email" : "text"}
+                  pattern={field === "mobile" ? "\\d{10}" : undefined}
+                  maxLength={field === "mobile" ? 10 : undefined}
+                  value={editForm[field]}
+                  onChange={(e) => setEditForm({ ...editForm, [field]: e.target.value })}
+                  style={inputStyle}
+                />
+              </label>
+            ))}
+            <label style={labelStyle}>
+              Role
+              <select
+                value={editForm.role_id}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, role_id: Number(e.target.value) })
+                }
+                style={inputStyle}
+              >
+                {roleOptions.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button type="submit" disabled={saving} style={primaryButtonStyle}>
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingUser(null)}
+              style={secondaryButtonStyle}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
       <div style={tableWrapStyle}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "860px" }}>
           <thead>
@@ -360,24 +489,44 @@ export function UserListPage() {
                   <td style={tdStyle}>{ROLES[target.role_id] || "Unknown"}</td>
                   <td style={tdStyle}>{target.status}</td>
                   <td style={{ ...tdStyle, display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => toggleStatus(target)}
-                      style={secondaryButtonStyle}
-                    >
-                      {target.status === "Active" ? "Deactivate" : "Activate"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPasswordForm({ userId: String(target.user_id), password: "" });
-                        setShowPassword(true);
-                      }}
-                      style={secondaryButtonStyle}
-                    >
-                      <KeyIcon fontSize="small" />
-                      Password
-                    </button>
+                    {canManageUser(target) ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(target)}
+                          style={secondaryButtonStyle}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleStatus(target)}
+                          style={secondaryButtonStyle}
+                        >
+                          {target.status === "Active" ? "Deactivate" : "Activate"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPasswordForm({ userId: String(target.user_id), password: "" });
+                            setShowPassword(true);
+                          }}
+                          style={secondaryButtonStyle}
+                        >
+                          <KeyIcon fontSize="small" />
+                          Password
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteUser(target)}
+                          style={dangerButtonStyle}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <span style={{ color: "#94a3b8" }}>View only</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -449,6 +598,16 @@ const secondaryButtonStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: "5px",
+};
+
+const dangerButtonStyle = {
+  padding: "7px 10px",
+  background: "#fff7f6",
+  color: "#c0392b",
+  border: "1px solid #f3b4ae",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontWeight: 700,
 };
 
 const errorStyle = {

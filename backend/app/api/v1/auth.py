@@ -166,7 +166,9 @@ async def logout(
 ):
     """Revoke refresh token and log out."""
     refresh_token = request.cookies.get("refresh_token", "")
-    result = await auth_service.logout(db, current_user.user_id, refresh_token)
+    result = await auth_service.logout(
+        db, current_user.user_id, refresh_token, current_user.session_id
+    )
     response.delete_cookie("refresh_token", path="/api/v1/auth")
     return result
 

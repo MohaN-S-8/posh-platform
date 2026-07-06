@@ -165,13 +165,6 @@ class AuthService:
             lockout.failed_attempts = 0
             lockout.locked_until = None
 
-        access_token = create_access_token(
-            {
-                "user_id": user.user_id,
-                "company_id": user.company_id,
-                "role_id": user.role_id,
-            }
-        )
         raw_refresh, hashed_refresh = create_refresh_token()
 
         refresh_record = RefreshTokens(
@@ -181,6 +174,15 @@ class AuthService:
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
         db.add(refresh_record)
+        await db.flush()
+        access_token = create_access_token(
+            {
+                "user_id": user.user_id,
+                "company_id": user.company_id,
+                "role_id": user.role_id,
+                "session_id": refresh_record.id,
+            }
+        )
         await self._log_attempt(db, user.user_id, data.email, ip_address, True)
         await db.commit()
 
@@ -227,21 +229,22 @@ class AuthService:
                 detail="Your company is inactive. Contact your administrator.",
             )
 
+        raw_refresh, hashed_refresh = create_refresh_token()
+        refresh_record = RefreshTokens(
+            user_id=user.user_id,
+            token_hash=hashed_refresh,
+            ip_address=ip_address,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+        db.add(refresh_record)
+        await db.flush()
         access_token = create_access_token(
             {
                 "user_id": user.user_id,
                 "company_id": user.company_id,
                 "role_id": user.role_id,
+                "session_id": refresh_record.id,
             }
-        )
-        raw_refresh, hashed_refresh = create_refresh_token()
-        db.add(
-            RefreshTokens(
-                user_id=user.user_id,
-                token_hash=hashed_refresh,
-                ip_address=ip_address,
-                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
-            )
         )
         await self._log_attempt(db, user.user_id, user.email, ip_address, True)
         await db.commit()
@@ -263,24 +266,27 @@ class AuthService:
         if lockout.failed_attempts >= MAX_FAILED_ATTEMPTS:
             lockout.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
 
-    async def logout(self, db: AsyncSession, user_id: int, refresh_token: str) -> dict:
-        """Revoke the refresh token. Access token expires naturally after 15 min."""
+    async def logout(
+        self, db: AsyncSession, user_id: int, refresh_token: str, session_id: int | None = None
+    ) -> dict:
+        """Revoke the current session so its refresh and access tokens stop working."""
         import hashlib
 
-        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+        filters = [RefreshTokens.user_id == user_id, RefreshTokens.revoked == False]  # noqa: E712
+        if session_id:
+            filters.append(RefreshTokens.id == session_id)
+        elif refresh_token:
+            token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+            filters.append(RefreshTokens.token_hash == token_hash)
+        else:
+            filters.append(RefreshTokens.id == -1)
 
-        result = await db.execute(
-            select(RefreshTokens).where(
-                RefreshTokens.user_id == user_id,
-                RefreshTokens.token_hash == token_hash,
-                RefreshTokens.revoked == False,  # noqa: E712
-            )
-        )
-        token_record = result.scalar_one_or_none()
+        result = await db.execute(select(RefreshTokens).where(*filters))
+        token_records = result.scalars().all()
 
-        if token_record:
+        for token_record in token_records:
             token_record.revoked = True
-            await db.commit()
+        await db.commit()
 
         return {"message": "Logged out successfully."}
 
@@ -316,12 +322,18 @@ class AuthService:
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
         db.add(new_record)
+        await db.flush()
 
         # Fetch user for new access token
         user_result = await db.execute(
             select(UserMaster).where(UserMaster.user_id == token_record.user_id)
         )
         user = user_result.scalar_one()
+        if user.status != "Active" or user.is_deleted != "N":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is inactive. Contact your administrator.",
+            )
         company_result = await db.execute(
             select(CompanyMaster).where(
                 CompanyMaster.company_id == user.company_id,
@@ -340,6 +352,7 @@ class AuthService:
                 "user_id": user.user_id,
                 "company_id": user.company_id,
                 "role_id": user.role_id,
+                "session_id": new_record.id,
             }
         )
         await db.commit()

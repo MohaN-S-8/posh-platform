@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
+import { apiErrorMessage } from "../../api/errors";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { authInputStyle } from "../../styles/formStyles";
 import { useAuthStore } from "../../store/authStore";
@@ -83,36 +84,36 @@ export function LoginPage() {
       const { access_token, user_id, role_id, company_id } = res.data;
       setAuth({ user_id, role_id, company_id }, access_token);
 
-      if (role_id === 1 || role_id === 2 || role_id === 5) navigate("/admin");
+      if (role_id === 1 || role_id === 2) navigate("/admin");
       else if (role_id === 3) navigate("/hr");
-      else navigate("/employee");
+      else if (role_id === 4) navigate("/employee");
+      else navigate("/unauthorized");
     } catch (err) {
-      const detail = err.response?.data?.detail;
       if (err.response?.status === 423) {
-        setError(detail || "Account locked. Try again later.");
+        setError(apiErrorMessage(err, "Account locked. Try again later."));
       } else if (err.response?.status === 403) {
         setError(
-          detail || "Your account is inactive. Contact your administrator.",
+          apiErrorMessage(err, "Your account is inactive. Contact your administrator."),
         );
       } else {
-        setError(detail || "Invalid email or password.");
+        setError(apiErrorMessage(err, "Invalid email or password."));
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const startEntraLogin = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await authApi.entraStart();
-      window.location.href = res.data.auth_url;
-    } catch (err) {
-      setError(err.response?.data?.detail || "Microsoft Entra SSO is not configured.");
-      setLoading(false);
-    }
-  };
+  // const startEntraLogin = async () => {
+  //   setLoading(true);
+  //   setError("");
+  //   try {
+  //     const res = await authApi.entraStart();
+  //     window.location.href = res.data.auth_url;
+  //   } catch (err) {
+  //     setError(apiErrorMessage(err, "Microsoft Entra SSO is not configured."));
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div
@@ -270,7 +271,7 @@ export function LoginPage() {
           </button>
         </form>
 
-        <button
+        {/* <button
           type="button"
           onClick={startEntraLogin}
           disabled={loading}
@@ -288,7 +289,7 @@ export function LoginPage() {
           }}
         >
           Sign in with Microsoft Entra
-        </button>
+        </button> */}
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
           <Link

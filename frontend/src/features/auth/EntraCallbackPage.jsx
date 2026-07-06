@@ -4,9 +4,10 @@ import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { useAuthStore } from "../../store/authStore";
 
 function dashboardForRole(roleId) {
-  if (roleId === 1 || roleId === 2 || roleId === 5) return "/admin";
+  if (roleId === 1 || roleId === 2) return "/admin";
   if (roleId === 3) return "/hr";
-  return "/employee";
+  if (roleId === 4) return "/employee";
+  return "/unauthorized";
 }
 
 export function EntraCallbackPage() {

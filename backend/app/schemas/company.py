@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
@@ -24,6 +25,36 @@ class CompanyCreate(BaseModel):
             raise ValueError("Company name must be at least 2 characters")
         return v
 
+    @field_validator("website")
+    @classmethod
+    def validate_website(cls, v):
+        if not v:
+            return v
+        value = v.strip()
+        if not re.match(r"^https?://[^\s]+\.[^\s]+$", value):
+            raise ValueError("Website must be a valid http(s) URL")
+        return value
+
+    @field_validator("contact_mobile")
+    @classmethod
+    def validate_contact_mobile(cls, v):
+        if not v:
+            return v
+        value = v.strip()
+        if not re.match(r"^\d{10}$", value):
+            raise ValueError("Contact mobile must be exactly 10 digits")
+        return value
+
+    @field_validator("contact_person")
+    @classmethod
+    def validate_contact_person(cls, v):
+        if not v:
+            return v
+        value = v.strip()
+        if len(value) < 2:
+            raise ValueError("Contact person must be at least 2 characters")
+        return value
+
 
 class CompanyUpdate(BaseModel):
     company_name: Optional[str] = None
@@ -36,6 +67,21 @@ class CompanyUpdate(BaseModel):
     contact_person: Optional[str] = None
     contact_email: Optional[EmailStr] = None
     contact_mobile: Optional[str] = None
+
+    @field_validator("website")
+    @classmethod
+    def validate_website(cls, v):
+        return CompanyCreate.validate_website(v)
+
+    @field_validator("contact_mobile")
+    @classmethod
+    def validate_contact_mobile(cls, v):
+        return CompanyCreate.validate_contact_mobile(v)
+
+    @field_validator("contact_person")
+    @classmethod
+    def validate_contact_person(cls, v):
+        return CompanyCreate.validate_contact_person(v)
 
 
 class CompanyResponse(BaseModel):

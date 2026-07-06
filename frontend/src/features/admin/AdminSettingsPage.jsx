@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
+import { apiErrorMessage } from "../../api/errors";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 
 // const implementedItems = [
@@ -29,7 +30,7 @@ export function AdminSettingsPage() {
         const res = await apiClient.get("/admin/languages");
         setLanguages(res.data || []);
       } catch (err) {
-        setError(err.response?.data?.detail || "Unable to load settings.");
+        setError(apiErrorMessage(err, "Unable to load settings."));
       } finally {
         setLoading(false);
       }
