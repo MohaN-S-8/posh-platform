@@ -12,6 +12,7 @@ from app.models.concern import Concern  # noqa: F401
 from app.models.hr import EmployeeUploadBatch  # noqa: F401
 from app.models.language import LanguageMaster  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
+from app.models.policy import PoshPolicy  # noqa: F401
 from app.models.role import RoleMaster  # noqa: F401
 from app.models.training import (  # noqa: F401
     AssessmentOption,

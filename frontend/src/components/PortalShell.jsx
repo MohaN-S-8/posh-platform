@@ -10,8 +10,10 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
+import PolicyIcon from "@mui/icons-material/Policy";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SearchIcon from "@mui/icons-material/Search";
+import SettingsIcon from "@mui/icons-material/Settings";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import PropTypes from "prop-types";
 import { useEffect, useState } from "react";
@@ -23,7 +25,7 @@ import { canAccess } from "../utils/accessControl";
 
 const roleLabels = {
   1: "Super Admin",
-  2: "Admin",
+  2: "Corp Admin",
   5: "Client / Management",
   3: "HR / IC",
   4: "Employee",
@@ -33,6 +35,7 @@ function navForRole(roleId) {
   if (roleId === 4) {
     return [
       { label: "Home (Stats)", to: "/dashboard", icon: <DashboardIcon fontSize="small" /> },
+      { label: "PoSH Policy", to: "/posh-policy", icon: <PolicyIcon fontSize="small" /> },
       {
         label: "POSH Awareness Training",
         to: "/employee/courses",
@@ -46,6 +49,7 @@ function navForRole(roleId) {
   if (roleId === 3) {
     return [
       { label: "Home (Stats)", to: "/dashboard", icon: <DashboardIcon fontSize="small" /> },
+      { label: "PoSH Policy", to: "/posh-policy", icon: <PolicyIcon fontSize="small" /> },
       {
         label: "Employees",
         to: "/hr/users",
@@ -65,6 +69,11 @@ function navForRole(roleId) {
         requiredPermission: "training.assign",
       },
       {
+        label: "Assigned Work Orders",
+        to: "/admin/assigned-work-orders",
+        icon: <AssessmentIcon fontSize="small" />,
+      },
+      {
         label: "Reports",
         to: "/hr/reports",
         icon: <DownloadIcon fontSize="small" />,
@@ -75,6 +84,7 @@ function navForRole(roleId) {
   if (roleId === 5) {
     return [
       { label: "Home (Stats)", to: "/dashboard", icon: <DashboardIcon fontSize="small" /> },
+      { label: "PoSH Policy", to: "/posh-policy", icon: <PolicyIcon fontSize="small" /> },
       {
         label: "Users",
         to: "/admin/users",
@@ -85,17 +95,24 @@ function navForRole(roleId) {
   }
   return [
     { label: "Home (Stats)", to: "/dashboard", icon: <DashboardIcon fontSize="small" /> },
+    { label: "PoSH Policy", to: "/posh-policy", icon: <PolicyIcon fontSize="small" /> },
     {
       label: "Companies",
       to: "/admin/companies",
       icon: <AdminPanelSettingsIcon fontSize="small" />,
-      allowedRoles: [1],
+      allowedRoles: [1, 2],
     },
     {
       label: "Users",
       to: "/admin/users",
       icon: <GroupsIcon fontSize="small" />,
       requiredPermission: "users.manage",
+    },
+    {
+      label: "Assigned Work Orders",
+      to: "/admin/assigned-work-orders",
+      icon: <AssessmentIcon fontSize="small" />,
+      allowedRoles: [1, 2],
     },
     {
       label: "Videos",
@@ -120,6 +137,12 @@ function navForRole(roleId) {
       to: "/admin/audit-logs",
       icon: <HistoryIcon fontSize="small" />,
       requiredPermission: "reports.view",
+    },
+    {
+      label: "POSH Admin Config",
+      to: "/admin/config",
+      icon: <SettingsIcon fontSize="small" />,
+      allowedRoles: [1],
     },
     {
       label: "Concerns Received",

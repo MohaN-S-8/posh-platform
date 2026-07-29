@@ -4,6 +4,7 @@ import BusinessIcon from "@mui/icons-material/Business";
 import HistoryIcon from "@mui/icons-material/History";
 import PeopleIcon from "@mui/icons-material/People";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+import SettingsIcon from "@mui/icons-material/Settings";
 import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -78,7 +79,7 @@ export function AdminDashboard() {
       path: "/admin/companies",
       icon: <BusinessIcon />,
       status: "Available",
-      allowedRoles: [1],
+      allowedRoles: [1, 2],
     },
     {
       title: "User Management",
@@ -88,6 +89,14 @@ export function AdminDashboard() {
       status: "Available",
       allowedRoles: [1, 2, 5],
       requiredPermission: "users.manage",
+    },
+    {
+      title: "Assigned Work Orders",
+      description: "View company services assigned to you with contact details and timelines.",
+      path: "/admin/assigned-work-orders",
+      icon: <AssessmentIcon />,
+      status: "Available",
+      allowedRoles: [1, 2],
     },
     // {
     //   title: "Owner Admin Setup",
@@ -134,6 +143,14 @@ export function AdminDashboard() {
       requiredPermission: "reports.view",
     },
     {
+      title: "POSH Admin Config",
+      description: "Review POSH offices, master codes, access matrix, and flow status.",
+      path: "/admin/config",
+      icon: <SettingsIcon />,
+      status: "Available",
+      allowedRoles: [1],
+    },
+    {
       title: "Concerns Received",
       description: "Review concern submissions from users in your company.",
       path: "/admin/concerns",
@@ -160,7 +177,7 @@ export function AdminDashboard() {
         user?.role_id === 5
           ? "Client / Management Portal"
           : user?.role_id === 2
-            ? "Admin Portal"
+            ? "Corp Admin Portal"
             : "Super Admin Portal"
       }
       subtitle="Manage the workflows available to your role."

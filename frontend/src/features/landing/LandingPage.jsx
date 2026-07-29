@@ -26,7 +26,7 @@ export function LandingPage() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowSplash(false), 1500);
+    const timer = window.setTimeout(() => setShowSplash(false), 2000);
     return () => window.clearTimeout(timer);
   }, []);
 
