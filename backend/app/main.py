@@ -132,6 +132,26 @@ async def run_seed_on_startup():
                 """
             )
         )
+        template_column_result = await db.execute(
+            text(
+                """
+                SELECT COUNT(*) AS column_count
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'certificate_template'
+                  AND column_name = 'template_file_path'
+                """
+            )
+        )
+        if template_column_result.scalar_one() == 0:
+            await db.execute(
+                text(
+                    """
+                    ALTER TABLE certificate_template
+                    ADD COLUMN template_file_path VARCHAR(255) NULL
+                    """
+                )
+            )
 
         await db.execute(
             text(
@@ -139,7 +159,8 @@ async def run_seed_on_startup():
                 INSERT INTO role_master (role_id, role_name)
                 VALUES
                     (1, 'Super Admin'),
-                    (2, 'Company Admin'),
+                    (2, 'Admin'),
+                    (5, 'Client / Management'),
                     (3, 'HR / IC'),
                     (4, 'Employee')
                 ON DUPLICATE KEY UPDATE role_name = VALUES(role_name)
@@ -304,6 +325,8 @@ async def run_seed_on_startup():
                 SELECT 1, permission_id FROM permission_master
                 UNION SELECT 2, permission_id FROM permission_master
                 WHERE permission_key IN ('users.manage','videos.manage','certificates.manage','reports.view','training.assign')
+                UNION SELECT 5, permission_id FROM permission_master
+                WHERE permission_key IN ('users.manage')
                 UNION SELECT 3, permission_id FROM permission_master
                 WHERE permission_key IN ('users.manage','videos.upload','reports.view','training.assign')
                 UNION SELECT 4, permission_id FROM permission_master
