@@ -12,6 +12,7 @@ from app.api.v1.assessments import router as assessments_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.certificates import router as certificates_router
 from app.api.v1.company import router as company_router
+from app.api.v1.concerns import router as concerns_router
 from app.api.v1.employee import router as employee_router
 from app.api.v1.hr import router as hr_router
 from app.api.v1.notifications import router as notifications_router
@@ -38,6 +39,7 @@ if settings.APP_ENV.lower() == "production":
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(company_router, prefix="/api/v1")
+app.include_router(concerns_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(videos_router, prefix="/api/v1")
 app.include_router(assessments_router, prefix="/api/v1")
@@ -112,6 +114,24 @@ async def run_seed_on_startup():
                     record_id VARCHAR(100) NULL,
                     ip_address VARCHAR(45) NULL,
                     created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS concerns (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    company_id INT NOT NULL,
+                    category VARCHAR(100) NOT NULL,
+                    message TEXT NOT NULL,
+                    status ENUM('Open', 'Reviewed', 'Closed') DEFAULT 'Open',
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_date DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX ix_concerns_company_created (company_id, created_date),
+                    INDEX ix_concerns_user (user_id)
                 )
                 """
             )

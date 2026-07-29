@@ -17,6 +17,7 @@ import PropTypes from "prop-types";
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import apiClient from "../api/client";
+import { apiErrorMessage } from "../api/errors";
 import { useAuthStore } from "../store/authStore";
 import { canAccess } from "../utils/accessControl";
 
@@ -120,6 +121,12 @@ function navForRole(roleId) {
       icon: <HistoryIcon fontSize="small" />,
       requiredPermission: "reports.view",
     },
+    {
+      label: "Concerns Received",
+      to: "/admin/concerns",
+      icon: <ReportProblemIcon fontSize="small" />,
+      allowedRoles: [1, 2],
+    },
   ];
 }
 
@@ -139,7 +146,9 @@ export function PortalShell({ title, subtitle, children }) {
     message: "",
   });
   const [concernMessage, setConcernMessage] = useState("");
+  const [concernError, setConcernError] = useState("");
   const items = navForRole(user?.role_id).filter((item) => canAccess(user, item));
+  const canReportConcern = user?.role_id !== 1;
   const unreadCount = notifications.filter((item) => !item.is_read).length;
   const filteredItems = items.filter((item) =>
     item.label.toLowerCase().includes(searchQuery.trim().toLowerCase()),
@@ -179,6 +188,7 @@ export function PortalShell({ title, subtitle, children }) {
   const openPanel = (panel) => {
     setActivePanel((current) => (current === panel ? "" : panel));
     setConcernMessage("");
+    setConcernError("");
   };
 
   const openNotifications = async () => {
@@ -209,10 +219,17 @@ export function PortalShell({ title, subtitle, children }) {
     }
   };
 
-  const submitConcern = (event) => {
+  const submitConcern = async (event) => {
     event.preventDefault();
-    setConcernMessage("Concern details are ready. Please share this with your administrator or POSH committee contact.");
-    setConcern({ category: "Workplace concern", message: "" });
+    setConcernMessage("");
+    setConcernError("");
+    try {
+      await apiClient.post("/concerns/", concern);
+      setConcernMessage("Concern submitted successfully. Your administrator can review it.");
+      setConcern({ category: "Workplace concern", message: "" });
+    } catch (err) {
+      setConcernError(apiErrorMessage(err, "Unable to submit concern. Please try again."));
+    }
   };
 
   return (
@@ -279,13 +296,15 @@ export function PortalShell({ title, subtitle, children }) {
             </div>
           </div>
           <div className="portal-topbar-actions">
-            <button
-              type="button"
-              className="portal-primary-btn"
-              onClick={() => openPanel("concern")}
-            >
-              <ReportProblemIcon fontSize="small" /> Report a Concern
-            </button>
+            {canReportConcern && (
+              <button
+                type="button"
+                className="portal-primary-btn"
+                onClick={() => openPanel("concern")}
+              >
+                <ReportProblemIcon fontSize="small" /> Report a Concern
+              </button>
+            )}
             <button
               type="button"
               className="portal-icon-btn"
@@ -412,7 +431,7 @@ export function PortalShell({ title, subtitle, children }) {
           </section>
         )}
 
-        {activePanel === "concern" && (
+        {canReportConcern && activePanel === "concern" && (
           <div className="portal-modal-backdrop">
             <form className="portal-modal" onSubmit={submitConcern}>
               <div className="portal-action-panel-head">
@@ -423,6 +442,9 @@ export function PortalShell({ title, subtitle, children }) {
               </div>
               {concernMessage && (
                 <div className="portal-panel-success">{concernMessage}</div>
+              )}
+              {concernError && (
+                <div className="portal-panel-error">{concernError}</div>
               )}
               <label>
                 Category

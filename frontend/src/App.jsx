@@ -21,6 +21,7 @@ import { UserListPage } from "./features/admin/UserListPage";
 import { VideoListPage } from "./features/admin/VideoListPage";
 import { AdminAuditLogPage } from "./features/admin/AdminAuditLogPage";
 import { AdminAnalyticsPage } from "./features/admin/AdminAnalyticsPage";
+import { AdminConcernsPage } from "./features/admin/AdminConcernsPage";
 import { AdminReportsPage } from "./features/admin/AdminReportsPage";
 import { CertificateTemplatePage } from "./features/admin/CertificateTemplatePage";
 import { CertificateVerifyPage } from "./features/certificates/CertificateVerifyPage";
@@ -179,6 +180,16 @@ function App() {
             <ProtectedRoute>
               <RoleRoute allowedRoles={[1, 2]} requiredPermission="reports.view">
                 <AdminAnalyticsPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/concerns"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[1, 2]}>
+                <AdminConcernsPage />
               </RoleRoute>
             </ProtectedRoute>
           }

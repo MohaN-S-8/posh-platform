@@ -3,6 +3,7 @@ import BadgeIcon from "@mui/icons-material/Badge";
 import BusinessIcon from "@mui/icons-material/Business";
 import HistoryIcon from "@mui/icons-material/History";
 import PeopleIcon from "@mui/icons-material/People";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -131,6 +132,14 @@ export function AdminDashboard() {
       status: "Available",
       allowedRoles: [1, 2],
       requiredPermission: "reports.view",
+    },
+    {
+      title: "Concerns Received",
+      description: "Review concern submissions from users in your company.",
+      path: "/admin/concerns",
+      icon: <ReportProblemIcon />,
+      status: "Available",
+      allowedRoles: [1, 2],
     },
     {
       title: "Reports",
