@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PropTypes from "prop-types";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { PortalShell } from "../../components/PortalShell";
@@ -76,6 +77,11 @@ function Info({ label, value }) {
     </div>
   );
 }
+
+Info.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
 
 const gridStyle = {
   display: "grid",

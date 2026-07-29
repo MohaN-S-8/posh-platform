@@ -247,11 +247,13 @@ export function CompanyListPage() {
   }, [fetchCompanies]);
 
   useEffect(() => {
-    fetchMasters();
+    const masterTimer = window.setTimeout(fetchMasters, 0);
+    return () => window.clearTimeout(masterTimer);
   }, [fetchMasters]);
 
   useEffect(() => {
-    fetchAssignableUsers();
+    const usersTimer = window.setTimeout(fetchAssignableUsers, 0);
+    return () => window.clearTimeout(usersTimer);
   }, [fetchAssignableUsers]);
 
   const masterOptions = useCallback(

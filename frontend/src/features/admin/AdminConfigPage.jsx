@@ -84,7 +84,8 @@ export function AdminConfigPage() {
   };
 
   useEffect(() => {
-    fetchConfig();
+    const loadTimer = window.setTimeout(fetchConfig, 0);
+    return () => window.clearTimeout(loadTimer);
   }, []);
 
   const resetForms = () => {
