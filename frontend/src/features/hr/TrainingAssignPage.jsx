@@ -3,6 +3,13 @@ import apiClient from "../../api/client";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { PortalShell } from "../../components/PortalShell";
 
+const employeeOptionLabel = (employee) => {
+  const name = `${employee.first_name || ""} ${employee.last_name || ""}`.trim();
+  const employeeId = employee.employee_id ? ` (${employee.employee_id})` : "";
+  const department = employee.department ? ` - ${employee.department}` : "";
+  return `${name} - ${employee.email} - ${employee.role_label || "Employee"}${employeeId}${department}`;
+};
+
 export function TrainingAssignPage() {
   const [videos, setVideos] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -11,6 +18,7 @@ export function TrainingAssignPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [form, setForm] = useState({
     video_id: "",
     assign_type: "Company-Wide",
@@ -26,7 +34,7 @@ export function TrainingAssignPage() {
       setError("");
       try {
         const [videoRes, employeeRes] = await Promise.all([
-          apiClient.get("/videos/published"),
+          apiClient.get("/videos/assignable"),
           apiClient.get("/hr/employees"),
         ]);
         setVideos(videoRes.data);
@@ -45,9 +53,12 @@ export function TrainingAssignPage() {
     () => videos.find((video) => String(video.video_id) === String(form.video_id)),
     [videos, form.video_id],
   );
+  const publishedVideos = videos.filter((video) => video.status === "Published");
+  const pendingVideos = videos.filter((video) => video.status !== "Published");
 
   const canSubmit =
     form.video_id &&
+    selectedVideo?.status === "Published" &&
     (form.assign_type === "Company-Wide" ||
       (form.assign_type === "Individual" && form.assigned_to_user_id) ||
       (form.assign_type === "Department" && form.assigned_to_department));
@@ -59,8 +70,24 @@ export function TrainingAssignPage() {
       assigned_to_user_id: "",
       assigned_to_department: "",
     });
+    setEmployeeSearch("");
     setSuccess("");
     setError("");
+  };
+
+  const handleEmployeeSearch = (value) => {
+    setEmployeeSearch(value);
+    const normalized = value.trim().toLowerCase();
+    const match = employees.find((employee) => {
+      const label = employeeOptionLabel(employee).toLowerCase();
+      return (
+        label === normalized ||
+        String(employee.user_id) === value ||
+        String(employee.email || "").toLowerCase() === normalized ||
+        String(employee.employee_id || "").toLowerCase() === normalized
+      );
+    });
+    setForm({ ...form, assigned_to_user_id: match ? String(match.user_id) : "" });
   };
 
   const handleSubmit = async (e) => {
@@ -118,19 +145,45 @@ export function TrainingAssignPage() {
             >
               <option value="">Select published video</option>
               {videos.map((video) => (
-                <option key={video.video_id} value={video.video_id}>
+                <option
+                  key={video.video_id}
+                  value={video.video_id}
+                  disabled={video.status !== "Published"}
+                >
                   {video.title}
                   {video.duration_minutes ? ` (${video.duration_minutes} min)` : ""}
+                  {video.status !== "Published" ? ` - ${video.status}, waiting for approval` : ""}
                 </option>
               ))}
             </select>
             {!loadingOptions && videos.length === 0 && (
               <p style={hintStyle}>
-                No published videos available. Publish a video from Admin - Videos first.
+                No videos available yet. Upload a POSH video first.
               </p>
             )}
+            {!loadingOptions && videos.length > 0 && publishedVideos.length === 0 && (
+              <p style={hintStyle}>
+                {pendingVideos.length} video(s) are uploaded and waiting for Super Admin approval.
+                Assignment will unlock after publish.
+              </p>
+            )}
+            {!loadingOptions && pendingVideos.length > 0 && (
+              <div style={pendingListStyle}>
+                {pendingVideos.map((video) => (
+                  <div key={video.video_id} style={pendingItemStyle}>
+                    <span>{video.title}</span>
+                    <strong>{video.status === "Draft" ? "Waiting for approval" : video.status}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
             {selectedVideo && (
-              <p style={hintStyle}>Selected: {selectedVideo.title}</p>
+              <p style={hintStyle}>
+                Selected: {selectedVideo.title}
+                {selectedVideo.status !== "Published"
+                  ? " - waiting for Super Admin approval"
+                  : ""}
+              </p>
             )}
           </div>
 
@@ -167,22 +220,20 @@ export function TrainingAssignPage() {
           {form.assign_type === "Individual" && (
             <div style={{ marginBottom: "18px" }}>
               <label style={labelStyle}>Select Employee *</label>
-              <select
+              <input
                 required
-                value={form.assigned_to_user_id}
-                onChange={(e) =>
-                  setForm({ ...form, assigned_to_user_id: e.target.value })
-                }
+                type="text"
+                list="training-employee-options"
+                value={employeeSearch}
+                placeholder="Type name, email, or employee ID"
+                onChange={(e) => handleEmployeeSearch(e.target.value)}
                 style={inputStyle}
-              >
-                <option value="">Select employee</option>
+              />
+              <datalist id="training-employee-options">
                 {employees.map((employee) => (
-                  <option key={employee.user_id} value={employee.user_id}>
-                    {employee.first_name} {employee.last_name || ""} - {employee.email}
-                    {employee.department ? ` (${employee.department})` : ""}
-                  </option>
+                  <option key={employee.user_id} value={employeeOptionLabel(employee)} />
                 ))}
-              </select>
+              </datalist>
               {!loadingOptions && employees.length === 0 && (
                 <p style={hintStyle}>No active employees found for this company.</p>
               )}
@@ -325,6 +376,25 @@ const inputStyle = {
 const hintStyle = {
   margin: "8px 0 0",
   color: "var(--portal-muted)",
+  fontSize: "13px",
+};
+
+const pendingListStyle = {
+  marginTop: "12px",
+  display: "grid",
+  gap: "8px",
+};
+
+const pendingItemStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  padding: "10px 12px",
+  border: "1px solid #f0d7a8",
+  borderRadius: "8px",
+  background: "#fff8e8",
+  color: "#704600",
   fontSize: "13px",
 };
 

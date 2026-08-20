@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user, require_roles
+from app.core.dependencies import get_current_user, require_roles_or_matrix
 from app.db.session import get_db
 from app.models.concern import Concern
 from app.models.user import UserMaster
@@ -66,7 +66,7 @@ async def submit_concern(
 @router.get("/received")
 async def received_concerns(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles([1, 2])),
+    current_user=Depends(require_roles_or_matrix([1, 2], ["POSH Complaints"])),
 ):
     query = (
         select(Concern, UserMaster)
@@ -93,13 +93,39 @@ async def received_concerns(
     ]
 
 
+@router.get("/my")
+async def my_concerns(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Concern)
+        .where(
+            Concern.user_id == current_user.user_id,
+            Concern.company_id == current_user.company_id,
+        )
+        .order_by(Concern.created_date.desc(), Concern.id.desc())
+        .limit(50)
+    )
+    return [
+        {
+            "id": concern.id,
+            "category": concern.category,
+            "message": concern.message,
+            "status": concern.status,
+            "created_date": concern.created_date,
+        }
+        for concern in result.scalars().all()
+    ]
+
+
 @router.patch("/{concern_id}/status")
 async def update_concern_status(
     concern_id: int,
     data: ConcernStatusUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles([1, 2])),
+    current_user=Depends(require_roles_or_matrix([1, 2], ["POSH Complaints"])),
 ):
     result = await db.execute(select(Concern).where(Concern.id == concern_id))
     concern = result.scalar_one_or_none()

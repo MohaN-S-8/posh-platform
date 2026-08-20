@@ -69,6 +69,20 @@ services:
       - "8025:8025" # Web UI — visit http://localhost:8025 to see emails
     restart: unless-stopped
 
+  posh_migrate:
+    build:
+      context: ./backend
+    container_name: posh_migrate
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: >
+      sh -c "python scripts/repair_legacy_schema.py; status=$$?; if [ $$status -eq 3 ]; then alembic stamp head; elif [ $$status -ne 0 ]; then exit $$status; fi; alembic upgrade head"
+    restart: "no"
+
   # ─── Backend ──────────────────────────────────────────────
   backend:
     build:
@@ -87,6 +101,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      posh_migrate:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app # live code reloading in development
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -124,4 +140,3 @@ services:
 volumes:
   mysql_data:
   minio_data:
-

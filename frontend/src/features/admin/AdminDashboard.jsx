@@ -1,18 +1,76 @@
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import BadgeIcon from "@mui/icons-material/Badge";
-import BusinessIcon from "@mui/icons-material/Business";
-import HistoryIcon from "@mui/icons-material/History";
-import PeopleIcon from "@mui/icons-material/People";
-import ReportProblemIcon from "@mui/icons-material/ReportProblem";
-import SettingsIcon from "@mui/icons-material/Settings";
-import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { PortalShell } from "../../components/PortalShell";
 import { useAuthStore } from "../../store/authStore";
-import { canAccess } from "../../utils/accessControl";
+
+const dashboardItems = [
+  { title: "Home", description: "Role-based programme summary.", path: "/dashboard", accessItem: "Home" },
+  { title: "PoSH Policy", description: "Company policy and IC details.", path: "/posh-policy", accessItem: "PoSH Policy" },
+  { title: "Create Company & Work Order", description: "Company setup and work order tracking.", path: "/admin/companies", accessItem: "Create Company & Work Order" },
+  { title: "Company Registration", description: "PoSH registration details and admin setup.", path: "/admin/company-registration", accessItem: "Company Registration - PoSH" },
+  { title: "Create Admin", description: "Create company administrator accounts.", path: "/super-admin/create-admin", accessItem: "Create Admin" },
+  { title: "Employee Master", description: "Manage role-based company users.", path: "/admin/users", accessItem: "Employee Master - PoSH" },
+  { title: "Training Videos", description: "Upload and manage training content.", path: "/admin/videos", accessItem: "POSH Awareness Training" },
+  { title: "Certificates", description: "Certificate templates and verification setup.", path: "/admin/certificates", accessItem: "Assessment & Certificate" },
+  { title: "Compliance", description: "Training completion and compliance dashboard.", path: "/admin/compliance", accessItem: "POSH Compliance" },
+  { title: "Complaints", description: "Review PoSH concerns and cases.", path: "/admin/concerns", accessItem: "POSH Complaints" },
+  { title: "Audit", description: "Login and action audit history.", path: "/super-admin/audit-logs", accessItem: "POSH Audit" },
+  { title: "Analytics", description: "Training and certificate reports.", path: "/admin/analytics", accessItem: "Analytics & Reports" },
+  { title: "Reports", description: "Download audit-ready reports.", path: "/admin/reports", accessItem: "Analytics & Reports" },
+  { title: "Masters", description: "State, city, scope, and platform masters.", path: "/super-admin/masters", accessItem: "Masters (State/City/Scope)" },
+  { title: "PoSH Office Master", description: "Configure PoSH office records.", path: "/super-admin/posh-office-master", accessItem: "PoSH Office Master" },
+  { title: "Role & Access Matrix", description: "Control exactly what each role can see.", path: "/super-admin/role-access", accessItem: "Role & Access Matrix" },
+];
+
+const roleLabels = {
+  1: "Super Admin",
+  2: "Company Admin",
+  5: "Client Admin (Mgmt)",
+  3: "HR",
+  4: "Employee",
+};
+
+const defaultAllowed = {
+  "Super Admin": new Set([
+    "Home",
+    "PoSH Policy",
+    "POSH Awareness Training",
+    "IC Training",
+    "Advance Training",
+    "Assessment & Certificate",
+    "POSH Compliance",
+    "POSH Complaints",
+    "POSH Audit",
+    "Analytics & Reports",
+    "Create Admin",
+    "Masters (State/City/Scope)",
+    "Create Company & Work Order",
+    "Company Registration - PoSH",
+    "Employee Master - PoSH",
+    "PoSH Office Master",
+    "Role & Access Matrix",
+  ]),
+  "Company Admin": new Set([
+    "Home",
+    "PoSH Policy",
+    "Create Company & Work Order",
+    "Company Registration - PoSH",
+    "Employee Master - PoSH",
+  ]),
+  "Client Admin (Mgmt)": new Set([
+    "Home",
+    "PoSH Policy",
+    "POSH Awareness Training",
+    "Assessment & Certificate",
+    "POSH Compliance",
+    "POSH Complaints",
+    "POSH Audit",
+    "Analytics & Reports",
+    "Employee Master - PoSH",
+  ]),
+};
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
@@ -20,15 +78,25 @@ export function AdminDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsError, setAnalyticsError] = useState("");
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+  const [roleAccess, setRoleAccess] = useState([]);
+  const [accessError, setAccessError] = useState("");
+
+  useEffect(() => {
+    const loadRoleAccess = async () => {
+      setAccessError("");
+      try {
+        const res = await apiClient.get("/admin-config/my-role-access");
+        setRoleAccess(res.data || []);
+      } catch (err) {
+        setAccessError(apiErrorMessage(err, "Unable to load role access."));
+      }
+    };
+
+    loadRoleAccess();
+  }, []);
 
   useEffect(() => {
     const loadAnalytics = async () => {
-      if (user?.role_id === 5) {
-        setAnalytics(null);
-        setAnalyticsError("");
-        setLoadingAnalytics(false);
-        return;
-      }
       setLoadingAnalytics(true);
       setAnalyticsError("");
       try {
@@ -72,104 +140,17 @@ export function AdminDashboard() {
     ];
   }, [analytics, user?.role_id]);
 
-  const modules = [
-    {
-      title: "Company Management",
-      description: "Create companies, track status, and maintain employee strength.",
-      path: "/admin/companies",
-      icon: <BusinessIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-    },
-    {
-      title: "User Management",
-      description: "Create the next role in the management flow and maintain user access.",
-      path: "/admin/users",
-      icon: <PeopleIcon />,
-      status: "Available",
-      allowedRoles: [1, 2, 5],
-      requiredPermission: "users.manage",
-    },
-    {
-      title: "Assigned Work Orders",
-      description: "View company services assigned to you with contact details and timelines.",
-      path: "/admin/assigned-work-orders",
-      icon: <AssessmentIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-    },
-    // {
-    //   title: "Owner Admin Setup",
-    //   description: "Direct-link company owner flow for creating Admin users.",
-    //   path: "/owner/admin-setup",
-    //   icon: <PeopleIcon />,
-    //   status: "Owner",
-    //   allowedRoles: [1],
-    // },
-    {
-      title: "Video Management",
-      description: "Upload, publish, and manage POSH training videos.",
-      path: "/admin/videos",
-      icon: <VideoLibraryIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-      requiredPermission: "videos.manage",
-    },
-    {
-      title: "Certificate Module",
-      description: "Create certificate templates and manage generated certificate setup.",
-      path: "/admin/certificates",
-      icon: <BadgeIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-      requiredPermission: "certificates.manage",
-    },
-    {
-      title: "Analytics",
-      description: "Platform and company-level training metrics.",
-      path: "/admin/analytics",
-      icon: <AssessmentIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-      requiredPermission: "reports.view",
-    },
-    {
-      title: "Audit Logs",
-      description: "Review recent successful and failed login attempts.",
-      path: "/admin/audit-logs",
-      icon: <HistoryIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-      requiredPermission: "reports.view",
-    },
-    {
-      title: "POSH Admin Config",
-      description: "Review POSH offices, master codes, access matrix, and flow status.",
-      path: "/admin/config",
-      icon: <SettingsIcon />,
-      status: "Available",
-      allowedRoles: [1],
-    },
-    {
-      title: "Concerns Received",
-      description: "Review concern submissions from users in your company.",
-      path: "/admin/concerns",
-      icon: <ReportProblemIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-    },
-    {
-      title: "Reports",
-      description: "Download available Excel reports for audits and management.",
-      path: "/admin/reports",
-      icon: <AssessmentIcon />,
-      status: "Available",
-      allowedRoles: [1, 2],
-      requiredPermission: "reports.view",
-    },
-  ];
+  const allowedItems = useMemo(() => {
+    const accessMap = new Map(
+      roleAccess.map((record) => [record.access_item, Boolean(record.is_allowed)]),
+    );
+    const fallback = defaultAllowed[roleLabels[user?.role_id]] || new Set();
 
-  const visibleModules = modules.filter((module) => canAccess(user, module));
+    return dashboardItems.filter((item) => {
+      if (accessMap.has(item.accessItem)) return accessMap.get(item.accessItem);
+      return fallback.has(item.accessItem);
+    });
+  }, [roleAccess, user?.role_id]);
 
   return (
     <PortalShell
@@ -188,7 +169,7 @@ export function AdminDashboard() {
         <div className="portal-auto-grid">
           {user?.role_id === 5 ? (
             <div className="portal-card">
-              Create and manage HR / IC users for your company.
+              Your available modules are controlled by the Role & Access Matrix below.
             </div>
           ) : loadingAnalytics ? (
             <div className="portal-card">Loading analytics...</div>
@@ -217,41 +198,45 @@ export function AdminDashboard() {
 
       <section>
         <div className="portal-section-title">Admin Workspace</div>
+        {accessError && (
+          <div
+            className="portal-card"
+            style={{
+              borderColor: "#f3b4ae",
+              background: "#fff7f6",
+              color: "#c0392b",
+              marginBottom: "16px",
+            }}
+          >
+            {accessError}
+          </div>
+        )}
         <div className="portal-auto-grid">
-          {visibleModules.map((module) => {
-            const enabled = Boolean(module.path);
-            return (
-              <button
-                key={module.title}
-                type="button"
-                onClick={() => enabled && navigate(module.path)}
-                disabled={!enabled}
-                className="portal-card portal-tile"
-                style={{ cursor: enabled ? "pointer" : "not-allowed", opacity: enabled ? 1 : 0.78 }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "12px",
-                    marginBottom: "14px",
-                  }}
-                >
-                  <div style={{ color: "#4A2E83", display: "flex" }}>{module.icon}</div>
-                  <span
-                    className={`portal-badge ${
-                      module.status === "Available" ? "portal-badge-green" : "portal-badge-purple"
-                    }`}
-                  >
-                    {module.status}
-                  </span>
-                </div>
-                <h3 style={{ fontSize: "14.5px" }}>{module.title}</h3>
-                <p>{module.description}</p>
-              </button>
-            );
-          })}
+          {allowedItems.map((item) => (
+            <button
+              type="button"
+              key={`${item.accessItem}-${item.path}`}
+              className="portal-card"
+              onClick={() => navigate(item.path)}
+              style={{
+                textAlign: "left",
+                border: "1px solid var(--portal-border)",
+                cursor: "pointer",
+              }}
+            >
+              <h3 style={{ margin: "0 0 8px", color: "var(--portal-text)" }}>
+                {item.title}
+              </h3>
+              <p style={{ margin: 0, color: "var(--portal-muted)", lineHeight: 1.5 }}>
+                {item.description}
+              </p>
+            </button>
+          ))}
+          {allowedItems.length === 0 && (
+            <div className="portal-card" style={{ color: "var(--portal-muted)" }}>
+              No modules are assigned to this role yet.
+            </div>
+          )}
         </div>
       </section>
     </PortalShell>

@@ -109,6 +109,83 @@ async def run_seed_on_startup():
         await db.execute(
             text(
                 """
+                CREATE TABLE IF NOT EXISTS company_master (
+                    company_id INT PRIMARY KEY,
+                    company_code VARCHAR(50),
+                    company_name VARCHAR(255),
+                    status VARCHAR(50),
+                    is_deleted CHAR(1) DEFAULT 'N',
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS user_master (
+                    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    company_id INT,
+                    employee_id VARCHAR(50),
+                    first_name VARCHAR(100),
+                    last_name VARCHAR(100),
+                    email VARCHAR(100) UNIQUE,
+                    mobile VARCHAR(20),
+                    role_id INT,
+                    username VARCHAR(100),
+                    password_hash TEXT,
+                    status VARCHAR(30),
+                    is_deleted CHAR(1),
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS role_master (
+                    role_id INT PRIMARY KEY,
+                    role_name VARCHAR(100)
+                )
+            """
+            )
+        )
+        await db.execute(
+            text(
+                """
+        CREATE TABLE IF NOT EXISTS language_master (
+        language_id INT PRIMARY KEY,
+        language_name VARCHAR(100)
+        )
+        """
+            )
+        )
+        await db.execute(
+            text(
+                """
+        CREATE TABLE IF NOT EXISTS video_category (
+            category_id INT PRIMARY KEY,
+            category_name VARCHAR(150)
+        )
+        """
+            )
+        )
+        await db.execute(
+            text(
+                """
+        CREATE TABLE IF NOT EXISTS account_lockout (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT,
+        failed_attempts INT DEFAULT 0,
+        locked_until DATETIME NULL
+        )
+        """
+            )
+        )
+        await db.execute(
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS audit_logs (
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     user_id BIGINT NULL,
@@ -166,6 +243,22 @@ async def run_seed_on_startup():
         await db.execute(
             text(
                 """
+                CREATE TABLE IF NOT EXISTS posh_policy_acknowledgement (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    company_id INT NULL,
+                    policy_id BIGINT NULL,
+                    policy_version VARCHAR(50) NULL,
+                    acknowledged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_policy_ack_user_version (user_id, policy_id, policy_version),
+                    INDEX ix_policy_ack_user (user_id)
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS posh_master_codes (
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     category VARCHAR(80) NOT NULL,
@@ -211,6 +304,51 @@ async def run_seed_on_startup():
                 """
             )
         )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS posh_employee_master (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    company_id INT NOT NULL,
+                    employee_id VARCHAR(30) NOT NULL,
+                    first_name VARCHAR(100) NOT NULL,
+                    last_name VARCHAR(100) NULL,
+                    email VARCHAR(100) NOT NULL,
+                    mobile VARCHAR(20) NOT NULL,
+                    date_of_birth DATE NULL,
+                    father_name VARCHAR(150) NULL,
+                    emergency_contact VARCHAR(20) NULL,
+                    gender VARCHAR(20) NULL,
+                    blood_group VARCHAR(10) NULL,
+                    physically_challenged VARCHAR(10) NULL,
+                    marital_status VARCHAR(20) NULL,
+                    pan_number VARCHAR(20) NULL,
+                    foreign_national VARCHAR(10) NULL,
+                    joining_date DATE NULL,
+                    designation VARCHAR(100) NULL,
+                    department VARCHAR(100) NULL,
+                    location_city VARCHAR(150) NULL,
+                    employment_status VARCHAR(50) NULL,
+                    employee_status VARCHAR(50) NULL,
+                    resignation_date DATE NULL,
+                    resignation_reason VARCHAR(255) NULL,
+                    reporting_to VARCHAR(150) NULL,
+                    branch_name VARCHAR(150) NULL,
+                    branch_id VARCHAR(50) NULL,
+                    transfer_date DATE NULL,
+                    transfer_location VARCHAR(150) NULL,
+                    transfer_branch_name VARCHAR(150) NULL,
+                    transfer_branch_id VARCHAR(50) NULL,
+                    ic_role VARCHAR(100) NULL,
+                    status VARCHAR(30) DEFAULT 'Active',
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_date DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_posh_employee_master_company_emp (company_id, employee_id),
+                    UNIQUE KEY uq_posh_employee_master_company_email (company_id, email)
+                )
+                """
+            )
+        )
         for column_name, column_sql in [
             ("document_path", "ADD COLUMN document_path VARCHAR(500) NULL"),
             ("document_name", "ADD COLUMN document_name VARCHAR(255) NULL"),
@@ -241,6 +379,17 @@ async def run_seed_on_startup():
                     mime_type VARCHAR(100),
                     created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE KEY uq_video_quality (video_id, quality_label)
+                )
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS certificate_template (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    certificate_name VARCHAR(255) NULL,
+                    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
@@ -283,10 +432,34 @@ async def run_seed_on_startup():
                 await db.execute(text(f"ALTER TABLE {table_name} {column_sql}"))
 
         for column_name, column_sql in [
+            ("template_name", "ADD COLUMN template_name VARCHAR(100) NULL"),
+            ("logo_path", "ADD COLUMN logo_path VARCHAR(255) NULL"),
+            ("font_name", "ADD COLUMN font_name VARCHAR(50) NULL DEFAULT 'Helvetica'"),
+            ("signature_path", "ADD COLUMN signature_path VARCHAR(255) NULL"),
+            ("color_code", "ADD COLUMN color_code VARCHAR(20) NULL DEFAULT '#1a3c5e'"),
+            ("company_id", "ADD COLUMN company_id INT NULL"),
+            ("status", "ADD COLUMN status VARCHAR(30) NULL DEFAULT 'Pending'"),
+            ("updated_date", "ADD COLUMN updated_date DATETIME DEFAULT CURRENT_TIMESTAMP"),
+        ]:
+            await ensure_column("certificate_template", column_name, column_sql)
+
+        await db.execute(
+            text(
+                """
+                ALTER TABLE certificate_template
+                MODIFY status ENUM('Pending', 'Active', 'Inactive', 'Rejected') DEFAULT 'Pending'
+                """
+            )
+        )
+
+        for column_name, column_sql in [
             ("reference_no", "ADD COLUMN reference_no VARCHAR(50) NULL"),
             ("company_type", "ADD COLUMN company_type VARCHAR(100) NULL"),
             ("company_status_type", "ADD COLUMN company_status_type VARCHAR(50) NULL"),
-            ("approval_status", "ADD COLUMN approval_status VARCHAR(30) NULL DEFAULT 'Pending'"),
+            (
+                "approval_status",
+                "ADD COLUMN approval_status VARCHAR(30) NULL DEFAULT 'Pending'",
+            ),
             ("client_id", "ADD COLUMN client_id VARCHAR(100) NULL"),
             ("scope_codes_json", "ADD COLUMN scope_codes_json TEXT NULL"),
             ("service_details_json", "ADD COLUMN service_details_json TEXT NULL"),
@@ -295,7 +468,10 @@ async def run_seed_on_startup():
             ("corp_address_json", "ADD COLUMN corp_address_json TEXT NULL"),
             ("billing_address_json", "ADD COLUMN billing_address_json TEXT NULL"),
             ("account_contact_json", "ADD COLUMN account_contact_json TEXT NULL"),
-            ("coordinator_contact_json", "ADD COLUMN coordinator_contact_json TEXT NULL"),
+            (
+                "coordinator_contact_json",
+                "ADD COLUMN coordinator_contact_json TEXT NULL",
+            ),
             ("branches_json", "ADD COLUMN branches_json TEXT NULL"),
         ]:
             await ensure_column("company_master", column_name, column_sql)
@@ -306,7 +482,10 @@ async def run_seed_on_startup():
             ("emergency_contact", "ADD COLUMN emergency_contact VARCHAR(20) NULL"),
             ("gender", "ADD COLUMN gender VARCHAR(20) NULL"),
             ("blood_group", "ADD COLUMN blood_group VARCHAR(10) NULL"),
-            ("physically_challenged", "ADD COLUMN physically_challenged VARCHAR(10) NULL"),
+            (
+                "physically_challenged",
+                "ADD COLUMN physically_challenged VARCHAR(10) NULL",
+            ),
             ("marital_status", "ADD COLUMN marital_status VARCHAR(20) NULL"),
             ("pan_number", "ADD COLUMN pan_number VARCHAR(20) NULL"),
             ("foreign_national", "ADD COLUMN foreign_national VARCHAR(10) NULL"),
@@ -319,7 +498,10 @@ async def run_seed_on_startup():
             ("branch_id", "ADD COLUMN branch_id VARCHAR(50) NULL"),
             ("transfer_date", "ADD COLUMN transfer_date DATE NULL"),
             ("transfer_location", "ADD COLUMN transfer_location VARCHAR(150) NULL"),
-            ("transfer_branch_name", "ADD COLUMN transfer_branch_name VARCHAR(150) NULL"),
+            (
+                "transfer_branch_name",
+                "ADD COLUMN transfer_branch_name VARCHAR(150) NULL",
+            ),
             ("transfer_branch_id", "ADD COLUMN transfer_branch_id VARCHAR(50) NULL"),
             ("ic_role", "ADD COLUMN ic_role VARCHAR(100) NULL"),
         ]:
@@ -398,12 +580,36 @@ async def run_seed_on_startup():
                 "role_id": 1,
             },
             {
+                "employee_id": "CADMIN001",
+                "first_name": "Company",
+                "last_name": "Admin",
+                "email": "company.admin@posh.com",
+                "mobile": "9000000002",
+                "role_id": 2,
+            },
+            {
+                "employee_id": "CLIENT001",
+                "first_name": "Client",
+                "last_name": "Management",
+                "email": "client.mgmt@posh.com",
+                "mobile": "9000000003",
+                "role_id": 5,
+            },
+            {
                 "employee_id": "HR001",
                 "first_name": "HR",
-                "last_name": "Manager",
+                "last_name": "User",
                 "email": "hr@posh.com",
-                "mobile": "9000000002",
+                "mobile": "9000000004",
                 "role_id": 3,
+            },
+            {
+                "employee_id": "EMP001",
+                "first_name": "Employee",
+                "last_name": "User",
+                "email": "employee@posh.com",
+                "mobile": "9000000005",
+                "role_id": 4,
             },
         ]
 
@@ -458,7 +664,13 @@ async def run_seed_on_startup():
                 WHERE user_id IN (
                     SELECT user_id
                     FROM user_master
-                    WHERE email IN ('admin@posh.com', 'hr@posh.com')
+                    WHERE email IN (
+                        'admin@posh.com',
+                        'company.admin@posh.com',
+                        'client.mgmt@posh.com',
+                        'hr@posh.com',
+                        'employee@posh.com'
+                    )
                 )
                 """
             )
@@ -485,7 +697,8 @@ async def run_seed_on_startup():
                 DELETE rp FROM role_permission rp
                 JOIN permission_master pm ON pm.permission_id = rp.permission_id
                 WHERE
-                    (rp.role_id = 3 AND pm.permission_key = 'videos.manage')
+                    (rp.role_id = 2 AND pm.permission_key <> 'users.manage')
+                    OR (rp.role_id = 3 AND pm.permission_key IN ('videos.manage','reports.view'))
                     OR rp.role_id = 5
                 """
             )
@@ -496,11 +709,11 @@ async def run_seed_on_startup():
                 INSERT IGNORE INTO role_permission (role_id, permission_id)
                 SELECT 1, permission_id FROM permission_master
                 UNION SELECT 2, permission_id FROM permission_master
-                WHERE permission_key IN ('users.manage','videos.manage','certificates.manage','reports.view','training.assign')
-                UNION SELECT 5, permission_id FROM permission_master
                 WHERE permission_key IN ('users.manage')
+                UNION SELECT 5, permission_id FROM permission_master
+                WHERE permission_key IN ('users.manage','videos.upload','certificates.manage','reports.view','training.assign')
                 UNION SELECT 3, permission_id FROM permission_master
-                WHERE permission_key IN ('users.manage','videos.upload','reports.view','training.assign')
+                WHERE permission_key IN ('users.manage','videos.upload','training.assign')
                 UNION SELECT 4, permission_id FROM permission_master
                 WHERE permission_key IN ('courses.watch')
                 """
@@ -525,6 +738,7 @@ async def run_seed_on_startup():
                 """
                 INSERT INTO posh_master_codes (category, name, code, description, is_active)
                 VALUES
+                    ('Country Code', 'INDIA', 'IN', 'Default country code', TRUE),
                     ('State Code', 'Tamil Nadu', 'TN', 'Default state code', TRUE),
                     ('State Code', 'Karnataka', 'KA', 'Default state code', TRUE),
                     ('State Code', 'Maharashtra', 'MH', 'Default state code', TRUE),
@@ -568,24 +782,48 @@ async def run_seed_on_startup():
                 INSERT INTO posh_role_access
                     (role_label, access_item, access_status, is_allowed, display_order)
                 VALUES
-                    ('Employee', 'Home Page', 'Access enabled', TRUE, 1),
+                    ('Super Admin', 'Home', 'Access enabled', TRUE, 1),
+                    ('Super Admin', 'PoSH Policy', 'Access enabled', TRUE, 2),
+                    ('Super Admin', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
+                    ('Super Admin', 'Assessment & Certificate', 'Access enabled', TRUE, 4),
+                    ('Super Admin', 'POSH Compliance', 'Access enabled', TRUE, 5),
+                    ('Super Admin', 'POSH Complaints', 'Access enabled', TRUE, 6),
+                    ('Super Admin', 'POSH Audit', 'Access enabled', TRUE, 7),
+                    ('Super Admin', 'Analytics & Reports', 'Access enabled', TRUE, 8),
+                    ('Super Admin', 'Create Admin', 'Access enabled', TRUE, 9),
+                    ('Super Admin', 'Masters (State/City/Scope)', 'Access enabled', TRUE, 10),
+                    ('Super Admin', 'Create Company & Work Order', 'Access enabled', TRUE, 11),
+                    ('Super Admin', 'Company Registration - PoSH', 'Access enabled', TRUE, 12),
+                    ('Super Admin', 'Employee Master - PoSH', 'Access enabled', TRUE, 13),
+                    ('Super Admin', 'PoSH Office Master', 'Access enabled', TRUE, 14),
+                    ('Super Admin', 'Role & Access Matrix', 'Access enabled', TRUE, 15),
+                    ('Company Admin', 'Home', 'Access enabled', TRUE, 1),
+                    ('Company Admin', 'PoSH Policy', 'Access enabled', TRUE, 2),
+                    ('Company Admin', 'Create Company & Work Order', 'Access enabled', TRUE, 3),
+                    ('Company Admin', 'Company Registration - PoSH', 'Access enabled', TRUE, 4),
+                    ('Company Admin', 'Employee Master - PoSH', 'Access enabled', TRUE, 5),
+                    ('Client Admin (Mgmt)', 'Home', 'Access enabled', TRUE, 1),
+                    ('Client Admin (Mgmt)', 'PoSH Policy', 'Access enabled', TRUE, 2),
+                    ('Client Admin (Mgmt)', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
+                    ('Client Admin (Mgmt)', 'Assessment & Certificate', 'Access enabled', TRUE, 4),
+                    ('Client Admin (Mgmt)', 'POSH Compliance', 'Access enabled', TRUE, 5),
+                    ('Client Admin (Mgmt)', 'POSH Complaints', 'Access enabled', TRUE, 6),
+                    ('Client Admin (Mgmt)', 'POSH Audit', 'Access enabled', TRUE, 7),
+                    ('Client Admin (Mgmt)', 'Analytics & Reports', 'Access enabled', TRUE, 8),
+                    ('Client Admin (Mgmt)', 'Employee Master - PoSH', 'Access enabled', TRUE, 9),
+                    ('HR', 'Home', 'Access enabled', TRUE, 1),
+                    ('HR', 'PoSH Policy', 'Access enabled', TRUE, 2),
+                    ('HR', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
+                    ('HR', 'POSH Compliance', 'Access enabled', TRUE, 4),
+                    ('HR', 'Analytics & Reports', 'Access enabled', TRUE, 5),
+                    ('HR', 'Employee Master - PoSH', 'Access enabled', TRUE, 6),
+                    ('Employee', 'Home', 'Access enabled', TRUE, 1),
                     ('Employee', 'PoSH Policy', 'Access enabled', TRUE, 2),
                     ('Employee', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
-                    ('Employee', 'Assessment & Certificates', 'Access enabled', TRUE, 4),
-                    ('Employee', 'Raise POSH Complaints', 'Access enabled', TRUE, 5),
-                    ('PO / Member', 'Home Page', 'Access enabled', TRUE, 1),
-                    ('PO / Member', 'PoSH Policy', 'Access enabled', TRUE, 2),
-                    ('PO / Member', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
-                    ('PO / Member', 'IC Training', 'Access enabled', TRUE, 4),
-                    ('PO / Member', 'Assessment & Certificates', 'Access enabled', TRUE, 5),
-                    ('PO / Member', 'Advance Training', 'NO Access', FALSE, 6),
-                    ('PO / Member', 'POSH Compliance', 'Access enabled', TRUE, 7),
-                    ('PO / Member', 'Raise POSH Complaints', 'Access enabled', TRUE, 8),
-                    ('PO / Member', 'Analytics & Reports', 'Access enabled', TRUE, 9)
+                    ('Employee', 'Assessment & Certificate', 'Access enabled', TRUE, 4),
+                    ('Employee', 'POSH Complaints', 'Access enabled', TRUE, 5)
                 ON DUPLICATE KEY UPDATE
-                    access_status = VALUES(access_status),
-                    is_allowed = VALUES(is_allowed),
-                    display_order = VALUES(display_order)
+                    role_label = role_label
                 """
             )
         )
