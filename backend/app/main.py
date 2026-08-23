@@ -24,7 +24,13 @@ from app.core.config import settings
 
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="POSH Training Platform API", version="1.0.0", docs_url="/docs")
+app = FastAPI(
+    title="XYZ Portal API",
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -416,6 +422,19 @@ async def run_seed_on_startup():
             )
 
         async def ensure_column(table_name: str, column_name: str, column_sql: str):
+            table_result = await db.execute(
+                text(
+                    """
+                    SELECT COUNT(*) AS table_count
+                    FROM information_schema.tables
+                    WHERE table_schema = DATABASE()
+                      AND table_name = :table_name
+                    """
+                ),
+                {"table_name": table_name},
+            )
+            if table_result.scalar_one() == 0:
+                return
             column_result = await db.execute(
                 text(
                     """
@@ -430,6 +449,27 @@ async def run_seed_on_startup():
             )
             if column_result.scalar_one() == 0:
                 await db.execute(text(f"ALTER TABLE {table_name} {column_sql}"))
+
+        for column_name, column_sql in [
+            ("service_code", "ADD COLUMN service_code VARCHAR(50) NULL DEFAULT 'POSH'"),
+            ("training_level", "ADD COLUMN training_level VARCHAR(50) NULL DEFAULT 'Basic'"),
+            (
+                "target_audience",
+                "ADD COLUMN target_audience VARCHAR(50) NULL DEFAULT 'Employee'",
+            ),
+        ]:
+            await ensure_column("video_master", column_name, column_sql)
+        await db.execute(
+            text(
+                """
+                UPDATE video_master
+                SET
+                    service_code = COALESCE(service_code, 'POSH'),
+                    training_level = COALESCE(training_level, 'Basic'),
+                    target_audience = COALESCE(target_audience, 'Employee')
+                """
+            )
+        )
 
         for column_name, column_sql in [
             ("template_name", "ADD COLUMN template_name VARCHAR(100) NULL"),
@@ -515,9 +555,41 @@ async def run_seed_on_startup():
                     (1, 'Super Admin'),
                     (2, 'Admin'),
                     (5, 'Client / Management'),
-                    (3, 'HR / IC'),
+                    (3, 'IC'),
                     (4, 'Employee')
                 ON DUPLICATE KEY UPDATE role_name = VALUES(role_name)
+                """
+            )
+        )
+
+        await db.execute(
+            text(
+                """
+                UPDATE user_master
+                SET
+                    employee_id = 'IC001',
+                    first_name = 'IC',
+                    last_name = 'User',
+                    email = 'ic@posh.com',
+                    username = 'ic@posh.com'
+                WHERE
+                    role_id = 3
+                    AND (
+                        email = 'hr@posh.com'
+                        OR username = 'hr@posh.com'
+                        OR employee_id = 'HR001'
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM (
+                            SELECT user_id
+                            FROM user_master
+                            WHERE
+                                email = 'ic@posh.com'
+                                OR username = 'ic@posh.com'
+                                OR employee_id = 'IC001'
+                        ) AS existing_ic_seed
+                    )
                 """
             )
         )
@@ -528,7 +600,7 @@ async def run_seed_on_startup():
                 INSERT INTO company_master
                     (company_id, company_code, company_name, status, is_deleted)
                 VALUES
-                    (1, 'DEFAULT', 'POSH Platform', 'Active', 'N')
+                    (1, 'DEFAULT', 'XYZ Portal', 'Active', 'N')
                 ON DUPLICATE KEY UPDATE
                     company_code = VALUES(company_code),
                     company_name = VALUES(company_name),
@@ -596,10 +668,10 @@ async def run_seed_on_startup():
                 "role_id": 5,
             },
             {
-                "employee_id": "HR001",
-                "first_name": "HR",
+                "employee_id": "IC001",
+                "first_name": "IC",
                 "last_name": "User",
-                "email": "hr@posh.com",
+                "email": "ic@posh.com",
                 "mobile": "9000000004",
                 "role_id": 3,
             },
@@ -668,7 +740,7 @@ async def run_seed_on_startup():
                         'admin@posh.com',
                         'company.admin@posh.com',
                         'client.mgmt@posh.com',
-                        'hr@posh.com',
+                        'ic@posh.com',
                         'employee@posh.com'
                     )
                 )
@@ -682,6 +754,7 @@ async def run_seed_on_startup():
                 VALUES
                     ('users.manage', 'Manage Users'),
                     ('videos.upload', 'Upload Videos'),
+                    ('videos.publish', 'Publish Videos'),
                     ('videos.manage', 'Manage Videos'),
                     ('certificates.manage', 'Manage Certificates'),
                     ('reports.view', 'View Reports'),
@@ -697,8 +770,8 @@ async def run_seed_on_startup():
                 DELETE rp FROM role_permission rp
                 JOIN permission_master pm ON pm.permission_id = rp.permission_id
                 WHERE
-                    (rp.role_id = 2 AND pm.permission_key <> 'users.manage')
-                    OR (rp.role_id = 3 AND pm.permission_key IN ('videos.manage','reports.view'))
+                    (rp.role_id = 2 AND pm.permission_key NOT IN ('users.manage','videos.upload','videos.publish'))
+                    OR (rp.role_id = 3 AND pm.permission_key IN ('videos.manage','videos.upload','reports.view'))
                     OR rp.role_id = 5
                 """
             )
@@ -709,11 +782,11 @@ async def run_seed_on_startup():
                 INSERT IGNORE INTO role_permission (role_id, permission_id)
                 SELECT 1, permission_id FROM permission_master
                 UNION SELECT 2, permission_id FROM permission_master
-                WHERE permission_key IN ('users.manage')
+                WHERE permission_key IN ('users.manage','videos.upload','videos.publish')
                 UNION SELECT 5, permission_id FROM permission_master
                 WHERE permission_key IN ('users.manage','videos.upload','certificates.manage','reports.view','training.assign')
                 UNION SELECT 3, permission_id FROM permission_master
-                WHERE permission_key IN ('users.manage','videos.upload','training.assign')
+                WHERE permission_key IN ('users.manage','training.assign','courses.watch')
                 UNION SELECT 4, permission_id FROM permission_master
                 WHERE permission_key IN ('courses.watch')
                 """
@@ -746,9 +819,6 @@ async def run_seed_on_startup():
                     ('City Code', 'Bangalore', 'BLR', 'Default city code', TRUE),
                     ('City Code', 'Mumbai', 'MUM', 'Default city code', TRUE),
                     ('Scope of Work ID', 'POSH Compliance', 'POSH', 'Policies, training, assessments, certificates, and reporting', TRUE),
-                    ('Scope of Work ID', 'Payroll Services', 'PAYS', 'Payroll service scope', TRUE),
-                    ('Scope of Work ID', 'Virtual Office', 'VOFF', 'Virtual office service scope', TRUE),
-                    ('Scope of Work ID', 'Recruitment', 'RECR', 'Recruitment service scope', TRUE),
                     ('Deliverables', 'PoSH Policy', 'POLICY', 'Policy documentation and publishing', TRUE),
                     ('Deliverables', 'Awareness Training', 'TRAINING', 'Training video assignment and completion tracking', TRUE),
                     ('Deliverables', 'Assessment & Certificates', 'CERTIFICATE', 'Assessment and certificate issue flow', TRUE),
@@ -759,6 +829,16 @@ async def run_seed_on_startup():
                     name = VALUES(name),
                     description = VALUES(description),
                     is_active = VALUES(is_active)
+                """
+            )
+        )
+        await db.execute(
+            text(
+                """
+                UPDATE posh_master_codes
+                SET is_active = FALSE
+                WHERE category = 'Scope of Work ID'
+                  AND code <> 'POSH'
                 """
             )
         )
@@ -788,35 +868,33 @@ async def run_seed_on_startup():
                     ('Super Admin', 'Assessment & Certificate', 'Access enabled', TRUE, 4),
                     ('Super Admin', 'POSH Compliance', 'Access enabled', TRUE, 5),
                     ('Super Admin', 'POSH Complaints', 'Access enabled', TRUE, 6),
-                    ('Super Admin', 'POSH Audit', 'Access enabled', TRUE, 7),
+                    ('Super Admin', 'Audit', 'Access enabled', TRUE, 7),
                     ('Super Admin', 'Analytics & Reports', 'Access enabled', TRUE, 8),
                     ('Super Admin', 'Create Admin', 'Access enabled', TRUE, 9),
-                    ('Super Admin', 'Masters (State/City/Scope)', 'Access enabled', TRUE, 10),
-                    ('Super Admin', 'Create Company & Work Order', 'Access enabled', TRUE, 11),
-                    ('Super Admin', 'Company Registration - PoSH', 'Access enabled', TRUE, 12),
-                    ('Super Admin', 'Employee Master - PoSH', 'Access enabled', TRUE, 13),
-                    ('Super Admin', 'PoSH Office Master', 'Access enabled', TRUE, 14),
+                    ('Super Admin', 'Masters', 'Access enabled', TRUE, 10),
+                    ('Super Admin', 'Company Setup', 'Access enabled', TRUE, 11),
+                    ('Super Admin', 'Employee Master', 'Access enabled', TRUE, 12),
                     ('Super Admin', 'Role & Access Matrix', 'Access enabled', TRUE, 15),
                     ('Company Admin', 'Home', 'Access enabled', TRUE, 1),
                     ('Company Admin', 'PoSH Policy', 'Access enabled', TRUE, 2),
-                    ('Company Admin', 'Create Company & Work Order', 'Access enabled', TRUE, 3),
-                    ('Company Admin', 'Company Registration - PoSH', 'Access enabled', TRUE, 4),
-                    ('Company Admin', 'Employee Master - PoSH', 'Access enabled', TRUE, 5),
+                    ('Company Admin', 'Company Setup', 'Access enabled', TRUE, 3),
+                    ('Company Admin', 'Employee Master', 'Access enabled', TRUE, 4),
                     ('Client Admin (Mgmt)', 'Home', 'Access enabled', TRUE, 1),
                     ('Client Admin (Mgmt)', 'PoSH Policy', 'Access enabled', TRUE, 2),
                     ('Client Admin (Mgmt)', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
                     ('Client Admin (Mgmt)', 'Assessment & Certificate', 'Access enabled', TRUE, 4),
                     ('Client Admin (Mgmt)', 'POSH Compliance', 'Access enabled', TRUE, 5),
                     ('Client Admin (Mgmt)', 'POSH Complaints', 'Access enabled', TRUE, 6),
-                    ('Client Admin (Mgmt)', 'POSH Audit', 'Access enabled', TRUE, 7),
+                    ('Client Admin (Mgmt)', 'Audit', 'Access enabled', TRUE, 7),
                     ('Client Admin (Mgmt)', 'Analytics & Reports', 'Access enabled', TRUE, 8),
-                    ('Client Admin (Mgmt)', 'Employee Master - PoSH', 'Access enabled', TRUE, 9),
-                    ('HR', 'Home', 'Access enabled', TRUE, 1),
-                    ('HR', 'PoSH Policy', 'Access enabled', TRUE, 2),
-                    ('HR', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
-                    ('HR', 'POSH Compliance', 'Access enabled', TRUE, 4),
-                    ('HR', 'Analytics & Reports', 'Access enabled', TRUE, 5),
-                    ('HR', 'Employee Master - PoSH', 'Access enabled', TRUE, 6),
+                    ('Client Admin (Mgmt)', 'Employee Master', 'Access enabled', TRUE, 9),
+                    ('IC', 'Home', 'Access enabled', TRUE, 1),
+                    ('IC', 'PoSH Policy', 'Access enabled', TRUE, 2),
+                    ('IC', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
+                    ('IC', 'POSH Compliance', 'Access enabled', TRUE, 4),
+                    ('IC', 'POSH Complaints', 'Access enabled', TRUE, 5),
+                    ('IC', 'Analytics & Reports', 'Access enabled', TRUE, 6),
+                    ('IC', 'Employee Master', 'Access enabled', TRUE, 7),
                     ('Employee', 'Home', 'Access enabled', TRUE, 1),
                     ('Employee', 'PoSH Policy', 'Access enabled', TRUE, 2),
                     ('Employee', 'POSH Awareness Training', 'Access enabled', TRUE, 3),
@@ -829,17 +907,17 @@ async def run_seed_on_startup():
         )
 
         await db.commit()
-        print("Auto-seed complete: roles, default company, admin, and HR users are ready.")
+        print("Auto-seed complete: roles, default company, admin, and IC users are ready.")
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "app": "POSH Training Platform"}
+    return {"status": "ok", "app": "XYZ Portal"}
 
 
 @app.get("/")
 async def root():
-    return {"message": "POSH Platform API. Visit /docs for documentation."}
+    return {"message": "XYZ Portal API"}
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

@@ -9,9 +9,9 @@ import { useAuthStore } from "../../store/authStore";
 const roleContent = {
   1: {
     title: "Super Admin Home",
-    subtitle: "Platform-wide PoSH programme, companies, users, compliance, and concerns.",
+    subtitle: "XYZ Portal overview across services, organizations, users, certificates, and approvals.",
     scope: "All companies",
-    checklist: ["Companies configured", "Admin users assigned", "Certificate templates active", "Audit reports available"],
+    checklist: ["Companies configured", "Services assigned", "Certificates issued", "Reports available"],
   },
   2: {
     title: "Admin Home",
@@ -21,12 +21,12 @@ const roleContent = {
   },
   5: {
     title: "Client / Management Home",
-    subtitle: "Management view for HR / IC setup and company user readiness.",
+    subtitle: "Management view for IC setup and company user readiness.",
     scope: "Your company",
-    checklist: ["HR / IC users ready", "Employee data monitored", "Training assignment tracked", "Compliance reviewed"],
+    checklist: ["IC users ready", "Employee data monitored", "Training assignment tracked", "Compliance reviewed"],
   },
   3: {
-    title: "HR / IC Home",
+    title: "IC Home",
     subtitle: "Employee records, training assignment, IC readiness, and reports.",
     scope: "Your company",
     checklist: ["Employees uploaded", "Training assigned", "Pending users followed up", "Reports downloaded"],
@@ -102,6 +102,23 @@ function normalizeSummary(user, summary) {
   };
 }
 
+function trainingLibraryRows(serviceTraining) {
+  const rows = [];
+  Object.entries(serviceTraining || {})
+    .filter(([service]) => String(service || "").toUpperCase() === "POSH")
+    .forEach(([service, levels]) => {
+    Object.entries(levels || {}).forEach(([level, audiences]) => {
+      Object.entries(audiences || {}).forEach(([audience, counts]) => {
+        rows.push([
+          `${service} / ${level} / ${audience}`,
+          `${counts.published || 0} published / ${counts.draft || 0} draft`,
+        ]);
+      });
+    });
+  });
+  return rows.length ? rows : [["PoSH / Basic / Employee", "0 published / 0 draft"]];
+}
+
 export function StatsHomePage() {
   const { user } = useAuthStore();
   const [data, setData] = useState(null);
@@ -156,18 +173,31 @@ export function StatsHomePage() {
           ["Super Admin", data?.hierarchy?.super_admins ?? 0],
           ["Company Admin", data?.hierarchy?.company_admins ?? 0],
           ["Client / Management", data?.hierarchy?.client_management ?? 0],
-          ["HR", data?.hierarchy?.hr_users ?? 0],
+          ["IC", data?.hierarchy?.hr_users ?? 0],
           ["Employees", data?.hierarchy?.employees ?? 0],
         ],
       },
       {
-        title: "Company Governance",
+        title: "Organizations",
         rows: [
+          ["Total Companies", data?.organizations?.length ?? 0],
           ["Approved Companies", data?.companies?.approved ?? 0],
-          ["Pending Companies", data?.companies?.pending ?? 0],
+          ["Pending Approval", data?.companies?.pending ?? 0],
           ["Active Companies", data?.companies?.active ?? 0],
-          ["Inactive Companies", data?.companies?.inactive ?? 0],
         ],
+      },
+      {
+        title: "Services Provided",
+        rows: Object.entries(data?.services || {}).filter(
+          ([service]) => String(service || "").toUpperCase() === "POSH",
+        ).length
+          ? Object.entries(data.services)
+              .filter(([service]) => String(service || "").toUpperCase() === "POSH")
+              .map(([service, value]) => [
+              service,
+              `${value.companies} org / ${value.employees} emp / ${value.certificates} cert`,
+            ])
+          : [["PoSH", "0 org / 0 emp / 0 cert"]],
       },
       {
         title: "Training & Videos",
@@ -178,6 +208,10 @@ export function StatsHomePage() {
           ["Assignments", data?.training?.assignments ?? 0],
           ["In Progress", data?.training?.in_progress ?? 0],
         ],
+      },
+      {
+        title: "Training Library By Service",
+        rows: trainingLibraryRows(data?.service_training),
       },
       {
         title: "Assessments & Certificates",
@@ -235,7 +269,7 @@ export function StatsHomePage() {
           </div>
           <div className="portal-home-shield">
             <ShieldIcon />
-            <span>POSH</span>
+            <span>XYZ</span>
           </div>
         </section>
       )}
@@ -252,7 +286,7 @@ export function StatsHomePage() {
 
       {user?.role_id === 1 && (
         <section style={sectionStyle}>
-          <div className="portal-section-title">Platform Hierarchy & Workflow</div>
+          <div className="portal-section-title">XYZ Hierarchy, Services & Organizations</div>
           <div className="portal-auto-grid">
             {superAdminSections.map((section) => (
               <article key={section.title} className="portal-card">
@@ -271,10 +305,44 @@ export function StatsHomePage() {
         </section>
       )}
 
+      {user?.role_id === 1 && (
+        <section style={sectionStyle}>
+          <div className="portal-section-title">Organizations By Service</div>
+          <div className="portal-auto-grid">
+            {(data?.organizations || []).slice(0, 12).map((org) => (
+              <article key={org.company_id} className="portal-card">
+                <h3 style={sectionTitleStyle}>{org.company_name}</h3>
+                <div style={sectionRowsStyle}>
+                  <div style={sectionRowStyle}>
+                    <span>Services</span>
+                    <strong>{org.services?.join(", ") || "-"}</strong>
+                  </div>
+                  <div style={sectionRowStyle}>
+                    <span>Employees</span>
+                    <strong>{loading ? "-" : org.employees}</strong>
+                  </div>
+                  <div style={sectionRowStyle}>
+                    <span>Certificates</span>
+                    <strong>{loading ? "-" : org.certificates}</strong>
+                  </div>
+                  <div style={sectionRowStyle}>
+                    <span>Approval</span>
+                    <strong>{org.approval_status}</strong>
+                  </div>
+                </div>
+              </article>
+            ))}
+            {!loading && !data?.organizations?.length && (
+              <div className="portal-card">No organizations created yet.</div>
+            )}
+          </div>
+        </section>
+      )}
+
       <LoadingOverlay
         show={loading}
         title="Loading home"
-        message="Preparing your role-based PoSH home page."
+        message="Preparing your role-based XYZ Portal home page."
       />
     </PortalShell>
   );

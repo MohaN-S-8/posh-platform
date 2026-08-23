@@ -5,6 +5,7 @@ import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { PortalShell } from "../../components/PortalShell";
+import { useAuthStore } from "../../store/authStore";
 
 const initialForm = {
   category: "Workplace concern",
@@ -12,6 +13,7 @@ const initialForm = {
 };
 
 export function EmployeeConcernsPage() {
+  const { user } = useAuthStore();
   const [form, setForm] = useState(initialForm);
   const [concerns, setConcerns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,11 @@ export function EmployeeConcernsPage() {
   return (
     <PortalShell
       title="Raise Concern"
-      subtitle="Submit workplace or POSH concerns to your company administrator."
+      subtitle={
+        user?.role_id === 3
+          ? "Submit your own workplace or PoSH concern as an IC member."
+          : "Submit workplace or PoSH concerns to your company administrator."
+      }
     >
       {error && <div style={errorStyle}>{error}</div>}
       {success && <div style={successStyle}>{success}</div>}
