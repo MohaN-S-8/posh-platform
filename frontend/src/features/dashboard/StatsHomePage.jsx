@@ -23,13 +23,13 @@ const roleContent = {
     title: "Client / Management Home",
     subtitle: "Management view for IC setup and company user readiness.",
     scope: "Your company",
-    checklist: ["IC users ready", "Employee data monitored", "Training assignment tracked", "Compliance reviewed"],
+    checklist: ["IC users ready", "Employee data monitored", "Training availability tracked", "Compliance reviewed"],
   },
   3: {
     title: "IC Home",
-    subtitle: "Employee records, training assignment, IC readiness, and reports.",
+    subtitle: "Employee records, direct IC training, IC readiness, and reports.",
     scope: "Your company",
-    checklist: ["Employees uploaded", "Training assigned", "Pending users followed up", "Reports downloaded"],
+    checklist: ["Employees uploaded", "Training available", "Pending users followed up", "Reports downloaded"],
   },
   4: {
     title: "Employee Home",
@@ -67,7 +67,7 @@ function metricSet(user, data) {
     ];
   }
   return [
-    { label: "Assigned Courses", value: data?.total_courses ?? 0, trend: "My courses" },
+    { label: "Available Courses", value: data?.total_courses ?? 0, trend: "My courses" },
     { label: "Completed", value: data?.completed ?? 0, trend: "Training done" },
     { label: "Pending", value: (data?.in_progress ?? 0) + (data?.not_started ?? 0), trend: "Still open" },
     { label: "Certificates", value: data?.certificates ?? 0, trend: `${data?.completion_rate ?? 0}% complete` },

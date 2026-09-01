@@ -276,7 +276,7 @@ class VideoService:
     ) -> dict:
         """
         Generate a short-lived signed URL for video streaming.
-        Verifies the user is assigned this course first.
+        Verifies the published video is available to this user's audience.
         """
         # Verify video exists and belongs to this company
         result = await db.execute(
@@ -311,38 +311,7 @@ class VideoService:
         if user.role_id not in audience_role_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This training is not assigned to your user type.",
-            )
-
-        assignment_matches = [
-            and_(
-                CourseAssignment.assign_type == "Individual",
-                CourseAssignment.assigned_to_user_id == user_id,
-            ),
-            CourseAssignment.assign_type == "Company-Wide",
-        ]
-        if user.department:
-            assignment_matches.append(
-                and_(
-                    CourseAssignment.assign_type == "Department",
-                    CourseAssignment.assigned_to_department == user.department,
-                )
-            )
-
-        # Verify this specific user is assigned this course.
-        assigned = await db.execute(
-            select(CourseAssignment.id)
-            .where(
-                CourseAssignment.video_id == video_id,
-                CourseAssignment.company_id == company_id,
-                or_(*assignment_matches),
-            )
-            .limit(1)
-        )
-        if assigned.scalar_one_or_none() is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not assigned to this course.",
+                detail="This training is not available to your user type.",
             )
 
         # Generate signed URL (expires in 5 minutes)
@@ -553,7 +522,7 @@ class VideoService:
                 user_ids=watcher_ids,
                 company_id=history.company_id,
                 title="Training completed",
-                message=f"{user.first_name if user else 'An employee'} completed assigned training.",
+                message=f"{user.first_name if user else 'An employee'} completed training.",
             )
 
         await db.commit()

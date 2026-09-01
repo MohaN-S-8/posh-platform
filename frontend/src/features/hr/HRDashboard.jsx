@@ -3,7 +3,6 @@ import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DownloadIcon from "@mui/icons-material/Download";
 import GroupsIcon from "@mui/icons-material/Groups";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -61,19 +60,11 @@ export function HRDashboard() {
   const modules = [
     {
       title: "My Training",
-      description: "Complete your own assigned PoSH training and assessment.",
+      description: "Complete published IC PoSH training and assessment.",
       path: "/ic/training",
       icon: <PlayCircleIcon />,
       status: "Available",
       requiredPermission: "courses.watch",
-    },
-    {
-      title: "Assign Training",
-      description: "Assign published PoSH training to employees or departments.",
-      path: "/hr/assign",
-      icon: <AssignmentTurnedInIcon />,
-      status: "Available",
-      requiredPermission: "training.assign",
     },
     {
       title: "Raise My Concern",
@@ -130,7 +121,7 @@ export function HRDashboard() {
   const visibleModules = modules.filter((module) => canAccess(user, module));
 
   return (
-    <PortalShell title="IC Portal" subtitle="Employee records and upload controls for IC users.">
+    <PortalShell title="IC Portal" subtitle="Employee records, direct IC training, concerns, and reports.">
 
       {error && (
         <div
@@ -147,10 +138,10 @@ export function HRDashboard() {
       )}
 
       <section style={{ marginBottom: "28px" }}>
-        <div className="portal-section-title">My Assigned Training</div>
+        <div className="portal-section-title">My Training</div>
         <div className="portal-auto-grid">
           {[
-            { label: "Assigned Courses", value: myTraining?.total_courses ?? 0 },
+            { label: "Available Courses", value: myTraining?.total_courses ?? 0 },
             { label: "Completed", value: myTraining?.completed ?? 0 },
             {
               label: "Pending",
@@ -161,7 +152,7 @@ export function HRDashboard() {
             <div key={stat.label} className="portal-card">
               <div className="portal-kpi-value">{loading ? "-" : stat.value}</div>
               <div className="portal-kpi-label">{stat.label}</div>
-              <div className="portal-kpi-trend">Assigned to you</div>
+              <div className="portal-kpi-trend">Published for IC</div>
             </div>
           ))}
         </div>
@@ -241,7 +232,7 @@ export function HRDashboard() {
           </h2>
           <div style={{ display: "grid", gap: "10px" }}>
             <div style={{ color: "#64748b", fontSize: "14px" }}>
-              IC access is restricted to the modules assigned to your role.
+              IC access is restricted to your organization and approved modules.
             </div>
             <button
               type="button"

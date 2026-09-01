@@ -29,7 +29,7 @@ export function CoursesPage() {
         if (active) setCourses(res.data || []);
       } catch (err) {
         if (active) {
-          setError(err.response?.data?.detail || "Unable to load your assigned courses.");
+          setError(err.response?.data?.detail || "Unable to load your available courses.");
         }
       } finally {
         if (active) setLoading(false);
@@ -46,8 +46,8 @@ export function CoursesPage() {
       title={user?.role_id === 3 ? "My IC Training" : "POSH Awareness Training"}
       subtitle={
         user?.role_id === 3
-          ? "Complete training assigned to you by Client / Management."
-          : "Watch assigned training videos, resume progress, and unlock assessments."
+          ? "Published IC training appears here automatically."
+          : "Published employee training appears here automatically, with progress and assessment unlocks."
       }
     >
 
@@ -68,16 +68,16 @@ export function CoursesPage() {
 
       {!loading && courses.length === 0 ? (
         <div className="portal-card" style={{ padding: "40px", textAlign: "center" }}>
-          <h2>No courses assigned yet</h2>
+          <h2>No courses available yet</h2>
           <p>
             {user?.role_id === 3
-              ? "Client / Management will assign IC training courses to you."
-              : "Your IC team will assign training courses to you."}
+              ? "No published IC training is available for your company yet."
+              : "No published employee training is available for your company yet."}
           </p>
         </div>
       ) : (
         <>
-          <div className="portal-section-title">Assigned Courses</div>
+          <div className="portal-section-title">Available Training</div>
           <div style={{ display: "grid", gap: "16px" }}>
           {courses.map((course) => {
             const complete = Math.round(course.completion_percent || 0);
@@ -222,7 +222,7 @@ export function CoursesPage() {
       <LoadingOverlay
         show={loading}
         title="Loading courses"
-        message="Fetching assigned training videos and progress."
+        message="Fetching available training videos and progress."
       />
     </PortalShell>
   );

@@ -70,7 +70,7 @@ export function EmployeeDashboard() {
   }, []);
 
   const stats = [
-    { label: "Assigned Courses", value: summary?.total_courses ?? 0 },
+    { label: "Available Courses", value: summary?.total_courses ?? 0 },
     { label: "Completed", value: summary?.completed ?? 0 },
     {
       label: "Pending",
@@ -108,7 +108,7 @@ export function EmployeeDashboard() {
   const modules = [
     {
       title: "Video Courses",
-      description: "Watch assigned POSH training videos and resume from saved progress.",
+      description: "Watch published POSH training videos and resume from saved progress.",
       path: "/employee/courses",
       icon: <PlayCircleIcon />,
       status: "Available",
@@ -146,7 +146,7 @@ export function EmployeeDashboard() {
   return (
     <PortalShell
       title="Home"
-      subtitle="Your PoSH programme, assigned training, assessments, and certificates."
+      subtitle="Your PoSH programme, available training, assessments, and certificates."
     >
 
       {error && (
@@ -306,7 +306,7 @@ export function EmployeeDashboard() {
       <LoadingOverlay
         show={loading}
         title="Loading employee portal"
-        message="Fetching assigned courses, progress, certificates, and training history."
+        message="Fetching available courses, progress, certificates, and training history."
       />
     </PortalShell>
   );
