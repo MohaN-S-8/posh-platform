@@ -35,28 +35,38 @@ def _docx_lines(file_bytes: bytes) -> list[str]:
     namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
     lines = []
     for paragraph in root.findall(".//w:p", namespace):
-        text = "".join(node.text or "" for node in paragraph.findall(".//w:t", namespace))
+        text = "".join(
+            node.text or "" for node in paragraph.findall(".//w:t", namespace)
+        )
         text = " ".join(text.split())
         if text:
             lines.append(text)
     return lines
 
 
-def _parse_docx_questions(lines: list[str], video_id: int) -> list[AssessmentQuestionCreate]:
+def _parse_docx_questions(
+    lines: list[str], video_id: int
+) -> list[AssessmentQuestionCreate]:
     questions = []
     text = " ".join(lines)
     text = re.sub(r"\s+", " ", text).strip()
-    question_start_pattern = re.compile(r"(?:^|\s)(?:question\s*)?(\d+)\s*[\).]\s+", re.I)
+    question_start_pattern = re.compile(
+        r"(?:^|\s)(?:question\s*)?(\d+)\s*[\).]\s+", re.I
+    )
     starts = list(question_start_pattern.finditer(text))
 
-    def build_question(question_text: str, options: list[dict], correct_option: str) -> None:
+    def build_question(
+        question_text: str, options: list[dict], correct_option: str
+    ) -> None:
         if not question_text or not correct_option:
             raise HTTPException(
                 400,
                 "Each DOCX question must include question text and Answer: A/B/C/D.",
             )
         if len(options) < 2:
-            raise HTTPException(400, "Each DOCX question must include at least two options.")
+            raise HTTPException(
+                400, "Each DOCX question must include at least two options."
+            )
         if correct_option not in {option["option_label"] for option in options}:
             raise HTTPException(
                 400,
@@ -82,7 +92,9 @@ def _parse_docx_questions(lines: list[str], video_id: int) -> list[AssessmentQue
 
         for index, start in enumerate(starts):
             block_start = start.end()
-            block_end = starts[index + 1].start() if index + 1 < len(starts) else len(text)
+            block_end = (
+                starts[index + 1].start() if index + 1 < len(starts) else len(text)
+            )
             block = text[block_start:block_end].strip()
             answer_match = answer_pattern.search(block)
             if not answer_match:
@@ -123,7 +135,9 @@ def _parse_docx_questions(lines: list[str], video_id: int) -> list[AssessmentQue
         answer_pattern = re.compile(
             r"^(?:correct\s+answer|answer|correct)[:\s\-]*([A-Da-d])\b", re.I
         )
-        question_pattern = re.compile(r"^(?:q(?:uestion)?\s*\d*[\).:\-]?|\d+[\).])\s*(.+)$", re.I)
+        question_pattern = re.compile(
+            r"^(?:q(?:uestion)?\s*\d*[\).:\-]?|\d+[\).])\s*(.+)$", re.I
+        )
 
         def push_current():
             if not current:
@@ -149,7 +163,11 @@ def _parse_docx_questions(lines: list[str], video_id: int) -> list[AssessmentQue
                 continue
 
             if current is None:
-                current = {"question_text": line.strip(), "options": [], "correct_option": ""}
+                current = {
+                    "question_text": line.strip(),
+                    "options": [],
+                    "correct_option": "",
+                }
                 continue
 
             if option_match:
@@ -186,7 +204,9 @@ def _parse_docx_questions(lines: list[str], video_id: int) -> list[AssessmentQue
 async def get_questions(
     video_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([3, 4], ["POSH Awareness Training"])),
+    current_user=Depends(
+        require_roles_with_matrix([3, 4], ["POSH Awareness Training"])
+    ),
 ):
     """Return assessment questions/options for a published company video."""
     return await assessment_service.questions(
@@ -198,7 +218,9 @@ async def get_questions(
 async def assessment_availability(
     video_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([3, 4], ["POSH Awareness Training"])),
+    current_user=Depends(
+        require_roles_with_matrix([3, 4], ["POSH Awareness Training"])
+    ),
 ):
     """Return whether the current user can take the assessment."""
     return await assessment_service.availability(
@@ -244,7 +266,9 @@ async def import_assessment_questions(
         )
     filename = file.filename or ""
     if not filename.lower().endswith(".docx"):
-        raise HTTPException(400, "Assessment questions must be uploaded as a .docx file.")
+        raise HTTPException(
+            400, "Assessment questions must be uploaded as a .docx file."
+        )
 
     file_bytes = await file.read()
     if not file_bytes:
@@ -265,7 +289,10 @@ async def import_assessment_questions(
         ip_address=request.client.host if request.client else None,
     )
     await db.commit()
-    return {"message": f"Imported {imported} assessment questions.", "imported": imported}
+    return {
+        "message": f"Imported {imported} assessment questions.",
+        "imported": imported,
+    }
 
 
 @router.delete("/questions/{question_id}")
@@ -276,7 +303,9 @@ async def delete_assessment_question(
     current_user=Depends(require_permission("videos.manage")),
 ):
     """Admin: delete an assessment question."""
-    result = await assessment_service.delete_question(db, question_id, current_user.company_id)
+    result = await assessment_service.delete_question(
+        db, question_id, current_user.company_id
+    )
     await write_audit_log(
         db,
         user_id=current_user.user_id,
@@ -294,7 +323,9 @@ async def delete_assessment_question(
 async def submit_assessment(
     data: AssessmentSubmit,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([3, 4], ["POSH Awareness Training"])),
+    current_user=Depends(
+        require_roles_with_matrix([3, 4], ["POSH Awareness Training"])
+    ),
 ):
     """
     Submit assessment answers.
@@ -302,4 +333,6 @@ async def submit_assessment(
     Returns score, pass/fail, and triggers certificate on Pass.
     """
 
-    return await assessment_service.submit(db, current_user.user_id, data, current_user.company_id)
+    return await assessment_service.submit(
+        db, current_user.user_id, data, current_user.company_id
+    )

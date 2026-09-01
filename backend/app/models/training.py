@@ -28,7 +28,9 @@ class TrainingHistory(Base):
     completion_percent = Column(Numeric(5, 2), default=0)
     furthest_position = Column(Integer, default=0)  # for no-fast-forward enforcement
     last_watched_position = Column(Integer, default=0)  # for resume
-    status = Column(Enum("Not Started", "In Progress", "Completed"), default="Not Started")
+    status = Column(
+        Enum("Not Started", "In Progress", "Completed"), default="Not Started"
+    )
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
     created_date = Column(DateTime, server_default=func.now())
@@ -44,7 +46,9 @@ class CourseAssignment(Base):
     video_id = Column(Integer, ForeignKey("video_master.video_id"))
     assigned_by = Column(BigInteger, ForeignKey("user_master.user_id"))
     company_id = Column(Integer, ForeignKey("company_master.company_id"))
-    assigned_to_user_id = Column(BigInteger, ForeignKey("user_master.user_id"), nullable=True)
+    assigned_to_user_id = Column(
+        BigInteger, ForeignKey("user_master.user_id"), nullable=True
+    )
     assigned_to_department = Column(String(100), nullable=True)
     assign_type = Column(Enum("Individual", "Department", "Company-Wide"))
     due_date = Column(DateTime)

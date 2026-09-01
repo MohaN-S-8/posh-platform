@@ -83,7 +83,9 @@ async def list_languages(
     current_user=Depends(require_permission("videos.manage")),
 ):
     """List platform languages configured in language_master."""
-    result = await db.execute(select(LanguageMaster).order_by(LanguageMaster.language_name))
+    result = await db.execute(
+        select(LanguageMaster).order_by(LanguageMaster.language_name)
+    )
     return [
         {"language_id": row.language_id, "language_name": row.language_name}
         for row in result.scalars().all()

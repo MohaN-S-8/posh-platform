@@ -196,7 +196,9 @@ async def delete_master_code(
     current_user=Depends(require_roles(SUPER_ADMIN_ROLES)),
 ):
     await _ensure_exists(db, "posh_master_codes", record_id)
-    await db.execute(text("DELETE FROM posh_master_codes WHERE id = :id"), {"id": record_id})
+    await db.execute(
+        text("DELETE FROM posh_master_codes WHERE id = :id"), {"id": record_id}
+    )
     await db.commit()
     return {"message": "Master code deleted."}
 
@@ -359,6 +361,8 @@ async def delete_role_access(
     current_user=Depends(require_roles(SUPER_ADMIN_ROLES)),
 ):
     await _ensure_exists(db, "posh_role_access", record_id)
-    await db.execute(text("DELETE FROM posh_role_access WHERE id = :id"), {"id": record_id})
+    await db.execute(
+        text("DELETE FROM posh_role_access WHERE id = :id"), {"id": record_id}
+    )
     await db.commit()
     return {"message": "Role access deleted."}

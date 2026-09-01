@@ -29,5 +29,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_certificates_video_id_video_master", "certificates", type_="foreignkey")
+    op.drop_constraint(
+        "fk_certificates_video_id_video_master", "certificates", type_="foreignkey"
+    )
     op.drop_column("certificates", "video_id")

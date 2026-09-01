@@ -17,7 +17,9 @@ class UserMaster(Base):
     __tablename__ = "user_master"
 
     user_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("company_master.company_id"), nullable=False)
+    company_id = Column(
+        Integer, ForeignKey("company_master.company_id"), nullable=False
+    )
     employee_id = Column(String(30), unique=True, nullable=False)
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100))

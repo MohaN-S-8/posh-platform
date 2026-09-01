@@ -25,7 +25,11 @@ user_service = UserService()
 # Role IDs: 1=Super Admin, 2=Admin, 5=Client / Management, 3=IC, 4=Employee
 ADMIN_ROLES = [1, 2]
 WORK_ORDER_ACCESS = ["Company Setup", "Create Company & Work Order"]
-REGISTRATION_ACCESS = ["Company Setup", "Company Registration", "Company Registration - PoSH"]
+REGISTRATION_ACCESS = [
+    "Company Setup",
+    "Company Registration",
+    "Company Registration - PoSH",
+]
 EMPLOYEE_MASTER_ACCESS = ["Employee Master", "Employee Master - PoSH"]
 
 
@@ -61,28 +65,40 @@ async def list_assignable_users(
 async def list_employee_master(
     company_id: Optional[int] = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)),
+    current_user=Depends(
+        require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)
+    ),
 ):
     """List POSH employee-master records for registration workflows."""
-    return await company_service.get_employee_master_records(db, current_user, company_id)
+    return await company_service.get_employee_master_records(
+        db, current_user, company_id
+    )
 
 
-@router.post("/employee-master/", response_model=EmployeeMasterResponse, status_code=201)
+@router.post(
+    "/employee-master/", response_model=EmployeeMasterResponse, status_code=201
+)
 async def create_employee_master(
     data: EmployeeMasterCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)),
+    current_user=Depends(
+        require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)
+    ),
 ):
     """Create employee-master records used by POSH registration."""
     return await company_service.create_employee_master_record(db, data, current_user)
 
 
-@router.put("/employee-master/{employee_master_id}", response_model=EmployeeMasterResponse)
+@router.put(
+    "/employee-master/{employee_master_id}", response_model=EmployeeMasterResponse
+)
 async def update_employee_master(
     employee_master_id: int,
     data: EmployeeMasterCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)),
+    current_user=Depends(
+        require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)
+    ),
 ):
     """Update a POSH employee-master record."""
     return await company_service.update_employee_master_record(
@@ -97,10 +113,14 @@ async def update_employee_master(
 async def delete_employee_master(
     employee_master_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)),
+    current_user=Depends(
+        require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)
+    ),
 ):
     """Delete a POSH employee-master record."""
-    return await company_service.delete_employee_master_record(db, employee_master_id, current_user)
+    return await company_service.delete_employee_master_record(
+        db, employee_master_id, current_user
+    )
 
 
 @router.patch("/employee-master/{employee_master_id}/status")
@@ -108,7 +128,9 @@ async def update_employee_master_status(
     employee_master_id: int,
     status: str,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)),
+    current_user=Depends(
+        require_roles_with_matrix([1, 2, 5, 3], EMPLOYEE_MASTER_ACCESS)
+    ),
 ):
     """Activate or deactivate a POSH employee-master record."""
     return await company_service.set_employee_master_status(

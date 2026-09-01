@@ -452,7 +452,10 @@ async def run_seed_on_startup():
 
         for column_name, column_sql in [
             ("service_code", "ADD COLUMN service_code VARCHAR(50) NULL DEFAULT 'POSH'"),
-            ("training_level", "ADD COLUMN training_level VARCHAR(50) NULL DEFAULT 'Basic'"),
+            (
+                "training_level",
+                "ADD COLUMN training_level VARCHAR(50) NULL DEFAULT 'Basic'",
+            ),
             (
                 "target_audience",
                 "ADD COLUMN target_audience VARCHAR(50) NULL DEFAULT 'Employee'",
@@ -479,7 +482,10 @@ async def run_seed_on_startup():
             ("color_code", "ADD COLUMN color_code VARCHAR(20) NULL DEFAULT '#1a3c5e'"),
             ("company_id", "ADD COLUMN company_id INT NULL"),
             ("status", "ADD COLUMN status VARCHAR(30) NULL DEFAULT 'Pending'"),
-            ("updated_date", "ADD COLUMN updated_date DATETIME DEFAULT CURRENT_TIMESTAMP"),
+            (
+                "updated_date",
+                "ADD COLUMN updated_date DATETIME DEFAULT CURRENT_TIMESTAMP",
+            ),
         ]:
             await ensure_column("certificate_template", column_name, column_sql)
 
@@ -907,7 +913,9 @@ async def run_seed_on_startup():
         )
 
         await db.commit()
-        print("Auto-seed complete: roles, default company, admin, and IC users are ready.")
+        print(
+            "Auto-seed complete: roles, default company, admin, and IC users are ready."
+        )
 
 
 @app.get("/health")
@@ -927,7 +935,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=()"
+        )
         return response
 
 

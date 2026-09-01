@@ -34,7 +34,9 @@ class VideoMaster(Base):
     training_level = Column(String(50), default="Basic")
     target_audience = Column(String(50), default="Employee")
     video_url = Column(String(500))  # path in MinIO/S3, NOT a public URL
-    storage_type = Column(Enum("AWS S3", "Azure Blob", "Local", "MinIO"), default="MinIO")
+    storage_type = Column(
+        Enum("AWS S3", "Azure Blob", "Local", "MinIO"), default="MinIO"
+    )
     status = Column(Enum("Draft", "Published", "Archived"), default="Draft")
     created_by = Column(BigInteger, ForeignKey("user_master.user_id"))
     company_id = Column(Integer, ForeignKey("company_master.company_id"))

@@ -56,7 +56,9 @@ class CompanyService:
     ) -> CompanyMaster:
         data_dict = data.model_dump()
 
-        data_dict["company_code"] = self._company_code_from_name(data_dict.get("company_name", ""))
+        data_dict["company_code"] = self._company_code_from_name(
+            data_dict.get("company_name", "")
+        )
         if len(data_dict["company_code"]) != 4:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -68,7 +70,9 @@ class CompanyService:
 
         # Check duplicate code
         existing = await db.execute(
-            select(CompanyMaster).where(CompanyMaster.company_code == data_dict["company_code"])
+            select(CompanyMaster).where(
+                CompanyMaster.company_code == data_dict["company_code"]
+            )
         )
         if existing.scalar_one_or_none():
             raise HTTPException(
@@ -114,7 +118,9 @@ class CompanyService:
                     "service_details_json",
                     company.service_details_json,
                 ),
-                "scope_codes_json": update_data.get("scope_codes_json", company.scope_codes_json),
+                "scope_codes_json": update_data.get(
+                    "scope_codes_json", company.scope_codes_json
+                ),
             }
             normalized = await self._normalize_service_details(db, merged_data)
             if current_user and current_user.role_id != 1:
@@ -141,7 +147,8 @@ class CompanyService:
         if missing_registration:
             raise HTTPException(
                 400,
-                "Complete company registration before approval: " + ", ".join(missing_registration),
+                "Complete company registration before approval: "
+                + ", ".join(missing_registration),
             )
         company.approval_status = "Approved"
         await db.commit()
@@ -168,19 +175,26 @@ class CompanyService:
             ("corporate address", corporate),
             ("billing address", billing),
         ]:
-            if not all(address.get(key) for key in ["address1", "city", "state", "pincode"]):
+            if not all(
+                address.get(key) for key in ["address1", "city", "state", "pincode"]
+            ):
                 missing.append(label)
 
         for label, contact in [
             ("account contact", account),
             ("coordinator contact", coordinator),
         ]:
-            if not all(contact.get(key) for key in ["name", "designation", "contact_no", "email"]):
+            if not all(
+                contact.get(key)
+                for key in ["name", "designation", "contact_no", "email"]
+            ):
                 missing.append(label)
 
         return missing
 
-    async def set_status(self, db: AsyncSession, company_id: int, new_status: str) -> CompanyMaster:
+    async def set_status(
+        self, db: AsyncSession, company_id: int, new_status: str
+    ) -> CompanyMaster:
         company = await self.get_by_id(db, company_id)
         company.status = new_status
         await db.commit()
@@ -314,7 +328,9 @@ class CompanyService:
             filters.append(UserMaster.company_id == current_user.company_id)
 
         result = await db.execute(
-            select(UserMaster).where(*filters).order_by(UserMaster.first_name, UserMaster.last_name)
+            select(UserMaster)
+            .where(*filters)
+            .order_by(UserMaster.first_name, UserMaster.last_name)
         )
         return [
             {
@@ -383,7 +399,9 @@ class CompanyService:
             },
         )
         if existing.first():
-            raise HTTPException(400, "Employee ID or email already exists for this company.")
+            raise HTTPException(
+                400, "Employee ID or email already exists for this company."
+            )
         insert_result = await db.execute(
             text(
                 """
@@ -431,7 +449,9 @@ class CompanyService:
         if not current_record:
             raise HTTPException(404, "Employee master record not found.")
 
-        await self.ensure_registration_access(db, current_record.company_id, current_user)
+        await self.ensure_registration_access(
+            db, current_record.company_id, current_user
+        )
         payload = data.model_dump()
         await self.ensure_registration_access(db, payload["company_id"], current_user)
         duplicate = await db.execute(
@@ -453,7 +473,9 @@ class CompanyService:
             },
         )
         if duplicate.first():
-            raise HTTPException(400, "Employee ID or email already exists for this company.")
+            raise HTTPException(
+                400, "Employee ID or email already exists for this company."
+            )
 
         payload["id"] = employee_master_id
         await db.execute(
@@ -589,7 +611,9 @@ class CompanyService:
         )
         return [dict(row._mapping) for row in result]
 
-    async def get_assigned_work_orders(self, db: AsyncSession, user_id: int) -> list[dict]:
+    async def get_assigned_work_orders(
+        self, db: AsyncSession, user_id: int
+    ) -> list[dict]:
         result = await db.execute(
             select(CompanyMaster)
             .where(
@@ -666,14 +690,20 @@ class CompanyService:
     ) -> CompanyMaster:
         company = await self.get_by_id(db, company_id)
         if company.approval_status != "Approved":
-            raise HTTPException(400, "Only approved work-order companies can be registered.")
+            raise HTTPException(
+                400, "Only approved work-order companies can be registered."
+            )
         if current_user.role_id != 1 and not self._has_assigned_service(
             company, current_user.user_id
         ):
-            raise HTTPException(403, "You do not have permission to register this company.")
+            raise HTTPException(
+                403, "You do not have permission to register this company."
+            )
         return company
 
-    async def can_access_work_order(self, db: AsyncSession, company_id: int, current_user) -> bool:
+    async def can_access_work_order(
+        self, db: AsyncSession, company_id: int, current_user
+    ) -> bool:
         company = await self.get_by_id(db, company_id)
         return self._has_assigned_service(company, current_user.user_id)
 
@@ -691,7 +721,9 @@ class CompanyService:
         data_dict["service_details_json"] = json.dumps(rows)
         return data_dict
 
-    async def _normalize_service_details(self, db: AsyncSession, data_dict: dict) -> dict:
+    async def _normalize_service_details(
+        self, db: AsyncSession, data_dict: dict
+    ) -> dict:
         rows = self._json_list(data_dict.get("service_details_json"))
         company_code = (data_dict.get("company_code") or "").strip().upper()
         year = datetime.now().strftime("%y")
@@ -742,7 +774,9 @@ class CompanyService:
 
     async def _next_client_sequence(self, db: AsyncSession) -> int:
         result = await db.execute(
-            select(CompanyMaster.service_details_json).where(CompanyMaster.is_deleted == "N")
+            select(CompanyMaster.service_details_json).where(
+                CompanyMaster.is_deleted == "N"
+            )
         )
         max_number = 0
         for value in result.scalars().all():
@@ -753,7 +787,9 @@ class CompanyService:
                     max_number = max(max_number, int(match.group(1)))
         return max_number + 1
 
-    async def _send_assignment_emails(self, db: AsyncSession, company: CompanyMaster) -> dict:
+    async def _send_assignment_emails(
+        self, db: AsyncSession, company: CompanyMaster
+    ) -> dict:
         from app.core.email import send_email
         from app.models.user import UserMaster
         from app.services.notification_service import notification_service
@@ -767,7 +803,9 @@ class CompanyService:
                 "message": "No service rows found.",
             }
         assigned_ids = {
-            int(row["assigned_to"]) for row in rows if str(row.get("assigned_to") or "").isdigit()
+            int(row["assigned_to"])
+            for row in rows
+            if str(row.get("assigned_to") or "").isdigit()
         }
         if not assigned_ids:
             return {
@@ -793,7 +831,9 @@ class CompanyService:
             }
         manager_ids = {user.manager_id for user in users.values() if user.manager_id}
         manager_result = (
-            await db.execute(select(UserMaster).where(UserMaster.user_id.in_(manager_ids)))
+            await db.execute(
+                select(UserMaster).where(UserMaster.user_id.in_(manager_ids))
+            )
             if manager_ids
             else None
         )
@@ -818,7 +858,9 @@ class CompanyService:
         sent = 0
         failed = 0
         for user_id, user in users.items():
-            assigned_rows = [row for row in rows if str(row.get("assigned_to")) == str(user_id)]
+            assigned_rows = [
+                row for row in rows if str(row.get("assigned_to")) == str(user_id)
+            ]
             manager = managers.get(user.manager_id)
             details = "".join(
                 f"""
@@ -887,7 +929,9 @@ class CompanyService:
             ),
         }
 
-    async def get_language_preferences(self, db: AsyncSession, company_id: int) -> list[dict]:
+    async def get_language_preferences(
+        self, db: AsyncSession, company_id: int
+    ) -> list[dict]:
         await self.get_by_id(db, company_id)
         result = await db.execute(
             text(

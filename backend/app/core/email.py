@@ -13,7 +13,9 @@ APP_ENV = os.environ.get("APP_ENV", "development")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:80")
 
 
-async def send_email(to: str, subject: str, html_body: str, cc: list[str] | None = None) -> None:
+async def send_email(
+    to: str, subject: str, html_body: str, cc: list[str] | None = None
+) -> None:
     message = MIMEMultipart("alternative")
     message["From"] = EMAILS_FROM
     message["To"] = to

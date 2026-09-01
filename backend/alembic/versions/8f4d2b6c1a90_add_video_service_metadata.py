@@ -22,11 +22,18 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column(
         "video_master",
-        sa.Column("service_code", sa.String(length=50), nullable=True, server_default="POSH"),
+        sa.Column(
+            "service_code", sa.String(length=50), nullable=True, server_default="POSH"
+        ),
     )
     op.add_column(
         "video_master",
-        sa.Column("training_level", sa.String(length=50), nullable=True, server_default="Basic"),
+        sa.Column(
+            "training_level",
+            sa.String(length=50),
+            nullable=True,
+            server_default="Basic",
+        ),
     )
     op.add_column(
         "video_master",

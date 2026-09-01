@@ -44,7 +44,9 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 @router.post("/signup")
 @limiter.limit("5/minute")
-async def signup(request: Request, data: SignupRequest, db: AsyncSession = Depends(get_db)):
+async def signup(
+    request: Request, data: SignupRequest, db: AsyncSession = Depends(get_db)
+):
     """Register a new user. Sends OTP to email for verification."""
     return await auth_service.signup(db, data)
 
@@ -111,7 +113,10 @@ async def entra_sso_callback(
     ):
         raise HTTPException(400, "Microsoft Entra SSO is not configured.")
 
-    token_url = f"https://login.microsoftonline.com/{settings.ENTRA_TENANT_ID}" "/oauth2/v2.0/token"
+    token_url = (
+        f"https://login.microsoftonline.com/{settings.ENTRA_TENANT_ID}"
+        "/oauth2/v2.0/token"
+    )
     async with httpx.AsyncClient(timeout=15) as client:
         token_res = await client.post(
             token_url,
@@ -176,7 +181,9 @@ async def logout(
 
 
 @router.post("/refresh")
-async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+async def refresh(
+    request: Request, response: Response, db: AsyncSession = Depends(get_db)
+):
     """Get new access token using refresh token."""
     refresh_token = request.cookies.get("refresh_token", "")
     result = await auth_service.refresh_access_token(db, refresh_token)
@@ -185,13 +192,17 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
 
 
 @router.post("/forgot-password")
-async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def forgot_password(
+    data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)
+):
     """Send password reset instructions to email."""
     return await auth_service.forgot_password(db, data.email)
 
 
 @router.post("/reset-password")
-async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def reset_password(
+    data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)
+):
     """Reset password using token from email."""
     return await auth_service.reset_password(db, data.token, data.new_password)
 
@@ -225,7 +236,9 @@ async def my_profile(
     )
     company_name = company_result.scalar_one_or_none()
     full_name = " ".join(
-        part for part in [user.first_name if user else "", user.last_name if user else ""] if part
+        part
+        for part in [user.first_name if user else "", user.last_name if user else ""]
+        if part
     ).strip()
     return {
         "user_id": current_user.user_id,

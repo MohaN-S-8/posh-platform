@@ -17,7 +17,9 @@ class EmployeeService:
             return False
         return bool(history and float(history.completion_percent or 0) >= 95)
 
-    async def list_courses(self, db: AsyncSession, user_id: int, company_id: int) -> list[dict]:
+    async def list_courses(
+        self, db: AsyncSession, user_id: int, company_id: int
+    ) -> list[dict]:
         user_result = await db.execute(
             select(UserMaster).where(
                 UserMaster.user_id == user_id,
@@ -30,7 +32,8 @@ class EmployeeService:
 
         audience_matches = [
             VideoMaster.target_audience == "All",
-            VideoMaster.target_audience == ("IC Member" if user.role_id == 3 else "Employee"),
+            VideoMaster.target_audience
+            == ("IC Member" if user.role_id == 3 else "Employee"),
         ]
         if user.role_id == 4:
             audience_matches.append(VideoMaster.target_audience.is_(None))
@@ -60,14 +63,18 @@ class EmployeeService:
                 continue
             seen_video_ids.add(video.video_id)
             status = history.status if history else "Not Started"
-            completion_percent = float(history.completion_percent or 0) if history else 0.0
+            completion_percent = (
+                float(history.completion_percent or 0) if history else 0.0
+            )
             assessment_result = await db.execute(
                 select(AssessmentResult)
                 .where(
                     AssessmentResult.user_id == user_id,
                     AssessmentResult.video_id == video.video_id,
                 )
-                .order_by(AssessmentResult.attempted_at.desc(), AssessmentResult.id.desc())
+                .order_by(
+                    AssessmentResult.attempted_at.desc(), AssessmentResult.id.desc()
+                )
                 .limit(1)
             )
             assessment = assessment_result.scalar_one_or_none()
@@ -118,7 +125,9 @@ class EmployeeService:
             "completion_rate": round((completed / total * 100), 2) if total else 0.0,
         }
 
-    async def training_history(self, db: AsyncSession, user_id: int, company_id: int) -> list[dict]:
+    async def training_history(
+        self, db: AsyncSession, user_id: int, company_id: int
+    ) -> list[dict]:
         courses = await self.list_courses(db, user_id, company_id)
         history_rows = []
 
@@ -129,7 +138,9 @@ class EmployeeService:
                     AssessmentResult.user_id == user_id,
                     AssessmentResult.video_id == course["video_id"],
                 )
-                .order_by(AssessmentResult.attempted_at.desc(), AssessmentResult.id.desc())
+                .order_by(
+                    AssessmentResult.attempted_at.desc(), AssessmentResult.id.desc()
+                )
                 .limit(1)
             )
             assessment = assessment_result.scalar_one_or_none()
@@ -142,7 +153,9 @@ class EmployeeService:
                     Certificate.company_id == company_id,
                     Certificate.status == "Valid",
                 )
-                .order_by(Certificate.issue_date.desc(), Certificate.certificate_id.desc())
+                .order_by(
+                    Certificate.issue_date.desc(), Certificate.certificate_id.desc()
+                )
                 .limit(1)
             )
             certificate = certificate_result.scalar_one_or_none()
@@ -156,7 +169,9 @@ class EmployeeService:
                     "completion_date": course["completed_at"],
                     "assessment_score": float(assessment.score) if assessment else None,
                     "assessment_result": assessment.result if assessment else None,
-                    "certificate_number": (certificate.certificate_number if certificate else None),
+                    "certificate_number": (
+                        certificate.certificate_number if certificate else None
+                    ),
                     "due_date": course["due_date"],
                 }
             )

@@ -16,7 +16,9 @@ router = APIRouter(prefix="/concerns", tags=["Concerns"])
 company_service = CompanyService()
 
 
-async def _visible_concern_company_ids(db: AsyncSession, current_user) -> list[int] | None:
+async def _visible_concern_company_ids(
+    db: AsyncSession, current_user
+) -> list[int] | None:
     if current_user.role_id == 1:
         return None
     if current_user.role_id == 2:
@@ -28,7 +30,9 @@ async def _visible_concern_company_ids(db: AsyncSession, current_user) -> list[i
     return [current_user.company_id]
 
 
-async def _ensure_can_see_concern(db: AsyncSession, current_user, concern: Concern) -> None:
+async def _ensure_can_see_concern(
+    db: AsyncSession, current_user, concern: Concern
+) -> None:
     company_ids = await _visible_concern_company_ids(db, current_user)
     if company_ids is not None and concern.company_id not in company_ids:
         raise HTTPException(403, "You cannot access this concern.")

@@ -278,11 +278,15 @@ class CertificateService:
                 )
                 story.append(Spacer(1, 0.3 * cm))
             except Exception:
-                logger.exception("Unable to embed certificate logo: %s", template.logo_path)
+                logger.exception(
+                    "Unable to embed certificate logo: %s", template.logo_path
+                )
         story.append(Paragraph("Certificate of Completion", title_style))
         story.append(Paragraph("This is to certify that", body_style))
         story.append(Paragraph(employee_name, name_style))
-        story.append(Paragraph("has successfully completed the POSH Training course", body_style))
+        story.append(
+            Paragraph("has successfully completed the POSH Training course", body_style)
+        )
         story.append(Paragraph(f"<b>{course_name}</b>", body_style))
         story.append(Spacer(1, 0.5 * cm))
         story.append(
@@ -294,7 +298,9 @@ class CertificateService:
         story.append(Spacer(1, 1 * cm))
         if template and template.signature_path:
             try:
-                signature_bytes = io.BytesIO(read_file(CERT_BUCKET, template.signature_path))
+                signature_bytes = io.BytesIO(
+                    read_file(CERT_BUCKET, template.signature_path)
+                )
                 story.append(
                     Image(
                         signature_bytes,
@@ -347,7 +353,9 @@ class CertificateService:
                 completion_date,
                 template,
             )
-        raise HTTPException(400, "Ready-made certificate template must be PDF, PNG, JPG, or JPEG.")
+        raise HTTPException(
+            400, "Ready-made certificate template must be PDF, PNG, JPG, or JPEG."
+        )
 
     def _template_overlay_pdf(
         self,
@@ -368,7 +376,9 @@ class CertificateService:
         except Exception:
             c.setFillColor(colors.HexColor("#1a3c5e"))
 
-        def cover_centered(x_center: float, y_center: float, box_width: float, box_height: float):
+        def cover_centered(
+            x_center: float, y_center: float, box_width: float, box_height: float
+        ):
             c.saveState()
             c.setFillColor(colors.white)
             c.rect(
@@ -422,7 +432,9 @@ class CertificateService:
     ) -> bytes:
         reader = PdfReader(io.BytesIO(template_bytes))
         if not reader.pages:
-            raise HTTPException(400, "Ready-made certificate template PDF has no pages.")
+            raise HTTPException(
+                400, "Ready-made certificate template PDF has no pages."
+            )
         template_page = reader.pages[0]
         width = float(template_page.mediabox.width)
         height = float(template_page.mediabox.height)
@@ -458,7 +470,9 @@ class CertificateService:
         width, height = landscape(A4)
         out = io.BytesIO()
         c = canvas.Canvas(out, pagesize=(width, height))
-        c.drawImage(ImageReader(io.BytesIO(template_bytes)), 0, 0, width=width, height=height)
+        c.drawImage(
+            ImageReader(io.BytesIO(template_bytes)), 0, 0, width=width, height=height
+        )
         c.save()
         overlay_reader = PdfReader(
             io.BytesIO(
@@ -518,7 +532,9 @@ class CertificateService:
 
     def _verification_url(self, cert_number: str) -> str:
         """Return the public frontend verification page for a certificate."""
-        return f"{settings.PUBLIC_APP_URL.rstrip('/')}/certificates/verify/{cert_number}"
+        return (
+            f"{settings.PUBLIC_APP_URL.rstrip('/')}/certificates/verify/{cert_number}"
+        )
 
     async def get_download_url(self, db, certificate_id: int, user_id: int) -> dict:
         """Get a short-lived signed URL to download the certificate PDF."""
@@ -550,7 +566,9 @@ class CertificateService:
         if (
             cert.video_id
             and template
-            and (cert.template_id != template.template_id or template.template_file_path)
+            and (
+                cert.template_id != template.template_id or template.template_file_path
+            )
         ):
             user_result = await db.execute(
                 select(UserMaster).where(UserMaster.user_id == cert.user_id)
@@ -726,9 +744,7 @@ class CertificateService:
 
         file_bytes = await file.read()
         extension = (file.filename or f"{asset_type}.png").split(".")[-1].lower()
-        object_key = (
-            f"certificate-templates/{template.company_id}/{template_id}/{asset_type}.{extension}"
-        )
+        object_key = f"certificate-templates/{template.company_id}/{template_id}/{asset_type}.{extension}"
         upload_file(
             file_bytes,
             CERT_BUCKET,
@@ -769,7 +785,8 @@ class CertificateService:
         template = await self._get_template(db, template_id, company_id)
         if template.status == "Active" and not allow_active_delete:
             raise HTTPException(
-                403, "Approved certificate templates can only be deleted by Super Admin."
+                403,
+                "Approved certificate templates can only be deleted by Super Admin.",
             )
         template_company_id = template.company_id
 
@@ -787,7 +804,9 @@ class CertificateService:
             .limit(1)
         )
         replacement_template = replacement_result.scalar_one_or_none()
-        replacement_template_id = replacement_template.template_id if replacement_template else None
+        replacement_template_id = (
+            replacement_template.template_id if replacement_template else None
+        )
 
         regenerated_count = 0
         if replacement_template:
@@ -843,7 +862,9 @@ class CertificateService:
                 try:
                     delete_file(CERT_BUCKET, object_key)
                 except Exception:
-                    logger.exception("Unable to delete certificate template file: %s", object_key)
+                    logger.exception(
+                        "Unable to delete certificate template file: %s", object_key
+                    )
         message = "Certificate template deleted."
         if replacement_template_id:
             message += (
