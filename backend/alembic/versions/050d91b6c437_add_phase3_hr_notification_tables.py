@@ -31,9 +31,7 @@ def upgrade() -> None:
         sa.Column("success_rows", sa.Integer(), nullable=True),
         sa.Column("failed_rows", sa.Integer(), nullable=True),
         sa.Column("error_report_path", sa.String(length=255), nullable=True),
-        sa.Column(
-            "status", sa.Enum("Processing", "Completed", "Failed"), nullable=True
-        ),
+        sa.Column("status", sa.Enum("Processing", "Completed", "Failed"), nullable=True),
         sa.Column(
             "created_date",
             sa.DateTime(),

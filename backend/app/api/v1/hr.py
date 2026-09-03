@@ -117,9 +117,7 @@ async def download_employee_report(
     return Response(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": "attachment; filename=employee_training_report.xlsx"
-        },
+        headers={"Content-Disposition": "attachment; filename=employee_training_report.xlsx"},
     )
 
 
@@ -134,9 +132,7 @@ async def download_department_report(
     return Response(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": "attachment; filename=department_compliance_report.xlsx"
-        },
+        headers={"Content-Disposition": "attachment; filename=department_compliance_report.xlsx"},
     )
 
 
@@ -165,9 +161,7 @@ async def download_employee_report_csv(
     return Response(
         content=csv_bytes,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": "attachment; filename=employee_training_report.csv"
-        },
+        headers={"Content-Disposition": "attachment; filename=employee_training_report.csv"},
     )
 
 
@@ -181,9 +175,7 @@ async def download_department_report_csv(
     return Response(
         content=csv_bytes,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": "attachment; filename=department_compliance_report.csv"
-        },
+        headers={"Content-Disposition": "attachment; filename=department_compliance_report.csv"},
     )
 
 
@@ -211,9 +203,7 @@ async def download_employee_report_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": "attachment; filename=employee_training_report.pdf"
-        },
+        headers={"Content-Disposition": "attachment; filename=employee_training_report.pdf"},
     )
 
 
@@ -227,9 +217,7 @@ async def download_department_report_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": "attachment; filename=department_compliance_report.pdf"
-        },
+        headers={"Content-Disposition": "attachment; filename=department_compliance_report.pdf"},
     )
 
 

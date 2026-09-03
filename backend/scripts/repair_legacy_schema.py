@@ -73,9 +73,7 @@ def add_missing_model_columns(engine) -> None:
                 if column.name in existing_columns:
                     continue
                 connection.execute(
-                    text(
-                        f"ALTER TABLE `{table.name}` ADD COLUMN {column_sql(engine, column)}"
-                    )
+                    text(f"ALTER TABLE `{table.name}` ADD COLUMN {column_sql(engine, column)}")
                 )
                 print(f"Added missing column {table.name}.{column.name}")
 

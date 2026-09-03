@@ -104,9 +104,7 @@ def upgrade() -> None:
         sa.Column("question_id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("video_id", sa.Integer(), nullable=True),
         sa.Column("question_text", sa.String(length=500), nullable=True),
-        sa.Column(
-            "question_type", sa.Enum("MCQ", "True/False", "Scenario"), nullable=True
-        ),
+        sa.Column("question_type", sa.Enum("MCQ", "True/False", "Scenario"), nullable=True),
         sa.Column("correct_option", sa.String(length=1), nullable=True),
         sa.Column(
             "created_date",
@@ -194,14 +192,10 @@ def upgrade() -> None:
         sa.Column("company_id", sa.Integer(), nullable=True),
         sa.Column("watched_seconds", sa.Integer(), nullable=True),
         sa.Column("total_seconds", sa.Integer(), nullable=True),
-        sa.Column(
-            "completion_percent", sa.Numeric(precision=5, scale=2), nullable=True
-        ),
+        sa.Column("completion_percent", sa.Numeric(precision=5, scale=2), nullable=True),
         sa.Column("furthest_position", sa.Integer(), nullable=True),
         sa.Column("last_watched_position", sa.Integer(), nullable=True),
-        sa.Column(
-            "status", sa.Enum("Not Started", "In Progress", "Completed"), nullable=True
-        ),
+        sa.Column("status", sa.Enum("Not Started", "In Progress", "Completed"), nullable=True),
         sa.Column("started_at", sa.DateTime(), nullable=True),
         sa.Column("completed_at", sa.DateTime(), nullable=True),
         sa.Column(

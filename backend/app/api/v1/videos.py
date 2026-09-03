@@ -266,9 +266,7 @@ async def delete_video(
 async def get_stream_url(
     video_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(
-        require_roles_with_matrix([3, 4], ["POSH Awareness Training"])
-    ),
+    current_user=Depends(require_roles_with_matrix([3, 4], ["POSH Awareness Training"])),
 ):
     """
     Get a short-lived signed URL for video streaming.
@@ -284,9 +282,7 @@ async def update_progress(
     video_id: int,
     data: ProgressUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(
-        require_roles_with_matrix([3, 4], ["POSH Awareness Training"])
-    ),
+    current_user=Depends(require_roles_with_matrix([3, 4], ["POSH Awareness Training"])),
 ):
     """
     Update video watch progress (called every 10 seconds by the player).

@@ -152,9 +152,7 @@ async def _serialize(db: AsyncSession, current_user, policy: PoshPolicy | None):
         ),
         "rights": _decode_json(policy.rights_json, DEFAULT_POLICY["rights"]),
         "faqs": _decode_json(policy.faqs_json, DEFAULT_POLICY["faqs"]),
-        "acknowledged": await _has_acknowledged(
-            db, current_user, policy.policy_id, policy_version
-        ),
+        "acknowledged": await _has_acknowledged(db, current_user, policy.policy_id, policy_version),
     }
 
 
@@ -167,9 +165,7 @@ async def _policy_for_user(db: AsyncSession, current_user):
         company_policy = company_result.scalar_one_or_none()
         if company_policy:
             return company_policy
-    global_result = await db.execute(
-        select(PoshPolicy).where(PoshPolicy.company_id.is_(None))
-    )
+    global_result = await db.execute(select(PoshPolicy).where(PoshPolicy.company_id.is_(None)))
     return global_result.scalar_one_or_none()
 
 
@@ -189,9 +185,7 @@ async def update_policy(
     current_user=Depends(require_roles([1, 2])),
 ):
     company_id = None if current_user.role_id == 1 else current_user.company_id
-    result = await db.execute(
-        select(PoshPolicy).where(PoshPolicy.company_id == company_id)
-    )
+    result = await db.execute(select(PoshPolicy).where(PoshPolicy.company_id == company_id))
     policy = result.scalar_one_or_none()
     if not policy:
         policy = PoshPolicy(company_id=company_id)
@@ -201,15 +195,11 @@ async def update_policy(
     policy.overview = data.overview.strip()
     policy.version = data.version.strip()
     policy.approved_date = data.approved_date.strip()
-    policy.harassment_types_json = json.dumps(
-        [item.model_dump() for item in data.harassment_types]
-    )
+    policy.harassment_types_json = json.dumps([item.model_dump() for item in data.harassment_types])
     policy.committee_members_json = json.dumps(
         [item.model_dump() for item in data.committee_members]
     )
-    policy.rights_json = json.dumps(
-        [item.strip() for item in data.rights if item.strip()]
-    )
+    policy.rights_json = json.dumps([item.strip() for item in data.rights if item.strip()])
     policy.faqs_json = json.dumps([item.model_dump() for item in data.faqs])
     policy.updated_by = current_user.user_id
     await db.flush()
@@ -243,9 +233,7 @@ async def upload_policy_document(
         raise HTTPException(400, "Please upload a PDF policy document.")
 
     company_id = None if current_user.role_id == 1 else current_user.company_id
-    result = await db.execute(
-        select(PoshPolicy).where(PoshPolicy.company_id == company_id)
-    )
+    result = await db.execute(select(PoshPolicy).where(PoshPolicy.company_id == company_id))
     policy = result.scalar_one_or_none()
     if not policy:
         policy = PoshPolicy(company_id=company_id)

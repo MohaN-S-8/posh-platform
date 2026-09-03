@@ -1,7 +1,4 @@
-import BadgeIcon from "@mui/icons-material/Badge";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DownloadIcon from "@mui/icons-material/Download";
-import GroupsIcon from "@mui/icons-material/Groups";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import { useEffect, useMemo, useState } from "react";
@@ -83,38 +80,12 @@ export function HRDashboard() {
       accessItem: "POSH Complaints",
     },
     {
-      title: "Employee Upload",
-      description: "Import employee records with Excel or CSV validation.",
-      path: "/hr/upload",
-      icon: <CloudUploadIcon />,
-      status: "Available",
-      requiredPermission: "users.manage",
-    },
-    {
-      title: "Employee Management",
-      description:
-        "Create, activate, deactivate, and reset employee accounts.",
-      path: "/hr/users",
-      icon: <GroupsIcon />,
-      status: "Available",
-      requiredPermission: "users.manage",
-    },
-    {
       title: "Analytics & Reports",
       description: "View compliance analytics and download company reports.",
       path: "/hr/reports",
       icon: <DownloadIcon />,
       status: "Available",
       requiredPermission: "reports.view",
-    },
-    {
-      title: "Employee Certificates",
-      description:
-        "Certificate activity remains visible through employee records only.",
-      path: "/hr/users",
-      icon: <BadgeIcon />,
-      status: "Restricted",
-      requiredPermission: "users.manage",
     },
   ];
 
@@ -234,22 +205,6 @@ export function HRDashboard() {
             <div style={{ color: "#64748b", fontSize: "14px" }}>
               IC access is restricted to your organization and approved modules.
             </div>
-            <button
-              type="button"
-              onClick={() => navigate("/hr/users")}
-              style={{
-                marginTop: "8px",
-                padding: "9px 12px",
-                background: "#4A2E83",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
-            >
-              Manage Employees
-            </button>
           </div>
         </div>
       </section>

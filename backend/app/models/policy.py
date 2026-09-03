@@ -9,9 +9,7 @@ class PoshPolicy(Base):
 
     policy_id = Column(BigInteger, primary_key=True, autoincrement=True)
     company_id = Column(Integer, nullable=True, unique=True)
-    title = Column(
-        String(200), default="Prevention, prohibition, and redressal at work."
-    )
+    title = Column(String(200), default="Prevention, prohibition, and redressal at work.")
     overview = Column(Text)
     version = Column(String(50), default="3.2")
     approved_date = Column(String(50), default="04 Jan 2026")

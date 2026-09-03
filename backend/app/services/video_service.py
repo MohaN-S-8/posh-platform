@@ -36,9 +36,7 @@ VIDEO_BUCKET = os.environ.get("MINIO_BUCKET_VIDEOS", "posh-videos")
 
 
 class VideoService:
-    async def _get_company_video(
-        self, db: AsyncSession, video_id: int, company_id: Optional[int]
-    ):
+    async def _get_company_video(self, db: AsyncSession, video_id: int, company_id: Optional[int]):
         filters = [VideoMaster.video_id == video_id]
         if company_id is not None:
             filters.append(VideoMaster.company_id == company_id)
@@ -120,14 +118,10 @@ class VideoService:
             },
         )
         if transcript_text:
-            transcript_key = (
-                f"videos/{company_id}/transcripts/{video.video_id}-english.vtt"
-            )
+            transcript_key = f"videos/{company_id}/transcripts/{video.video_id}-english.vtt"
             transcript_body = transcript_text.strip()
             if not transcript_body.startswith("WEBVTT"):
-                transcript_body = (
-                    f"WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n{transcript_body}"
-                )
+                transcript_body = f"WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n{transcript_body}"
             upload_file(
                 transcript_body.encode("utf-8"),
                 VIDEO_BUCKET,
@@ -167,7 +161,9 @@ class VideoService:
             raise HTTPException(400, f"Unsupported video format. Got: {mime_type}")
 
         file_ext = os.path.splitext(file.filename or "variant.mp4")[1].lower()
-        object_key = f"videos/{company_id}/qualities/{video_id}-{quality_label}-{uuid.uuid4()}{file_ext}"
+        object_key = (
+            f"videos/{company_id}/qualities/{video_id}-{quality_label}-{uuid.uuid4()}{file_ext}"
+        )
         upload_file(file_bytes, VIDEO_BUCKET, object_key, mime_type)
         await db.execute(
             text(
@@ -212,16 +208,14 @@ class VideoService:
             subtitle_bytes = await subtitle_file.read()
             subtitle_mime = magic.from_buffer(subtitle_bytes[:2048], mime=True)
             if subtitle_mime not in ALLOWED_SUBTITLE_MIME_TYPES:
-                raise HTTPException(
-                    400, f"Unsupported subtitle format. Got: {subtitle_mime}"
-                )
-            subtitle_key = f"videos/{company_id}/subtitles/{video_id}-{language_id}-{uuid.uuid4()}.vtt"
+                raise HTTPException(400, f"Unsupported subtitle format. Got: {subtitle_mime}")
+            subtitle_key = (
+                f"videos/{company_id}/subtitles/{video_id}-{language_id}-{uuid.uuid4()}.vtt"
+            )
             body = subtitle_bytes
             if not subtitle_bytes.lstrip().startswith(b"WEBVTT"):
                 text_body = subtitle_bytes.decode("utf-8", errors="ignore").strip()
-                body = f"WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n{text_body}".encode(
-                    "utf-8"
-                )
+                body = f"WEBVTT\n\n00:00:00.000 --> 99:59:59.000\n{text_body}".encode("utf-8")
             upload_file(body, VIDEO_BUCKET, subtitle_key, "text/vtt")
 
         if audio_file:
@@ -230,7 +224,9 @@ class VideoService:
             if audio_mime not in ALLOWED_AUDIO_MIME_TYPES:
                 raise HTTPException(400, f"Unsupported audio format. Got: {audio_mime}")
             audio_ext = os.path.splitext(audio_file.filename or "audio.mp3")[1].lower()
-            audio_key = f"videos/{company_id}/audio/{video_id}-{language_id}-{uuid.uuid4()}{audio_ext}"
+            audio_key = (
+                f"videos/{company_id}/audio/{video_id}-{language_id}-{uuid.uuid4()}{audio_ext}"
+            )
             upload_file(audio_bytes, VIDEO_BUCKET, audio_key, audio_mime)
 
         existing = await db.execute(
@@ -307,9 +303,7 @@ class VideoService:
         )
         user = user_result.scalar_one_or_none()
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
         audience_role_ids = {"IC Member": [3], "All": [3, 4]}.get(
             video.target_audience or "Employee",
             [4],
@@ -343,9 +337,7 @@ class VideoService:
             qualities = [
                 {
                     "label": "source",
-                    "stream_url": generate_presigned_url(
-                        VIDEO_BUCKET, video.video_url, 300
-                    ),
+                    "stream_url": generate_presigned_url(VIDEO_BUCKET, video.video_url, 300),
                 }
             ]
 
@@ -440,9 +432,7 @@ class VideoService:
         history = result.scalar_one_or_none()
 
         if not history:
-            raise HTTPException(
-                404, "No training history found. Start the video first."
-            )
+            raise HTTPException(404, "No training history found. Start the video first.")
 
         current_position = max(0, int(current_position or 0))
         total_duration = max(0, int(total_duration or history.total_seconds or 0))
@@ -457,20 +447,14 @@ class VideoService:
         if last_progress_at and last_progress_at.tzinfo is None:
             last_progress_at = last_progress_at.replace(tzinfo=timezone.utc)
         elapsed_since_save = (
-            max(0, int((now - last_progress_at).total_seconds()))
-            if last_progress_at
-            else 0
+            max(0, int((now - last_progress_at).total_seconds())) if last_progress_at else 0
         )
 
         # Player saves every 10s. A small tolerance avoids false positives from
         # timer drift/buffering while still blocking jump-to-end completion.
         allowed_forward_jump = 15
-        jumped_beyond_watched_range = (
-            current_position > previous_furthest + allowed_forward_jump
-        )
-        jumped_beyond_last_tick = (
-            current_position > previous_last + allowed_forward_jump
-        )
+        jumped_beyond_watched_range = current_position > previous_furthest + allowed_forward_jump
+        jumped_beyond_last_tick = current_position > previous_last + allowed_forward_jump
         if jumped_beyond_watched_range and jumped_beyond_last_tick:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -493,10 +477,7 @@ class VideoService:
             watched_seconds = min(watched_seconds, total_duration)
             history.total_seconds = total_duration
 
-        if (
-            current_position >= previous_last
-            or current_position >= previous_furthest - 5
-        ):
+        if current_position >= previous_last or current_position >= previous_furthest - 5:
             history.last_watched_position = current_position
         history.watched_seconds = watched_seconds
 
@@ -507,9 +488,7 @@ class VideoService:
             percent = (watched_seconds / total_duration) * 100
             history.completion_percent = round(min(percent, 100), 2)
 
-        reached_end = total_duration > 0 and current_position >= max(
-            0, total_duration - 1
-        )
+        reached_end = total_duration > 0 and current_position >= max(0, total_duration - 1)
         if reached_end:
             history.watched_seconds = total_duration
             history.furthest_position = max(previous_furthest, total_duration)
@@ -639,31 +618,21 @@ class VideoService:
             .select_from(AssessmentResult)
             .where(AssessmentResult.video_id == video_id)
         )
-        if (
-            usage_result.scalar_one()
-            or history_result.scalar_one()
-            or result_result.scalar_one()
-        ):
+        if usage_result.scalar_one() or history_result.scalar_one() or result_result.scalar_one():
             raise HTTPException(
                 409,
                 "This video has assignments or training history. Archive it instead.",
             )
 
         question_ids_result = await db.execute(
-            select(AssessmentQuestion.question_id).where(
-                AssessmentQuestion.video_id == video_id
-            )
+            select(AssessmentQuestion.question_id).where(AssessmentQuestion.video_id == video_id)
         )
         question_ids = list(question_ids_result.scalars().all())
         if question_ids:
             await db.execute(
-                delete(AssessmentOption).where(
-                    AssessmentOption.question_id.in_(question_ids)
-                )
+                delete(AssessmentOption).where(AssessmentOption.question_id.in_(question_ids))
             )
-        await db.execute(
-            delete(AssessmentQuestion).where(AssessmentQuestion.video_id == video_id)
-        )
+        await db.execute(delete(AssessmentQuestion).where(AssessmentQuestion.video_id == video_id))
         await db.execute(
             text("DELETE FROM video_language WHERE video_id = :video_id"),
             {"video_id": video_id},
@@ -686,9 +655,7 @@ class VideoService:
         if company_id is not None:
             filters.append(VideoMaster.company_id == company_id)
         result = await db.execute(
-            select(VideoMaster)
-            .where(*filters)
-            .order_by(VideoMaster.created_date.desc())
+            select(VideoMaster).where(*filters).order_by(VideoMaster.created_date.desc())
         )
         return result.scalars().all()
 

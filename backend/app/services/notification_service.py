@@ -106,9 +106,7 @@ class NotificationService:
             )
             .distinct()
         )
-        assigned_by_ids = [
-            int(user_id) for user_id in assignment_result.scalars().all() if user_id
-        ]
+        assigned_by_ids = [int(user_id) for user_id in assignment_result.scalars().all() if user_id]
         role_watchers = await self.active_user_ids_by_roles(
             db,
             company_id=company_id,

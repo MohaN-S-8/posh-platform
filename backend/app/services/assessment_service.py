@@ -142,9 +142,7 @@ class AssessmentService:
                     409,
                     "Please rewatch the training video to unlock another assessment attempt.",
                 )
-            raise HTTPException(
-                409, "Assessment has already been passed for this course."
-            )
+            raise HTTPException(409, "Assessment has already been passed for this course.")
 
         question_result = await db.execute(
             select(AssessmentQuestion)
@@ -174,9 +172,7 @@ class AssessmentService:
         self, db: AsyncSession, user_id: int, data: AssessmentSubmit, company_id: int
     ) -> dict:
         """Submit assessment answers. Video must be completed first."""
-        await self._ensure_video_available_for_user(
-            db, data.video_id, user_id, company_id
-        )
+        await self._ensure_video_available_for_user(db, data.video_id, user_id, company_id)
 
         # 1. Verify video is completed
         history_result = await db.execute(
@@ -345,9 +341,7 @@ class AssessmentService:
         correct = data.correct_option.strip().upper()
         option_labels = {option.option_label.strip().upper() for option in data.options}
         if correct not in option_labels:
-            raise HTTPException(
-                400, "Correct option must match one of the option labels."
-            )
+            raise HTTPException(400, "Correct option must match one of the option labels.")
 
         question = AssessmentQuestion(
             video_id=data.video_id,
@@ -372,9 +366,7 @@ class AssessmentService:
             "question_id": question.question_id,
         }
 
-    async def delete_question(
-        self, db: AsyncSession, question_id: int, company_id: int
-    ) -> dict:
+    async def delete_question(self, db: AsyncSession, question_id: int, company_id: int) -> dict:
         question_result = await db.execute(
             select(AssessmentQuestion)
             .join(VideoMaster, VideoMaster.video_id == AssessmentQuestion.video_id)

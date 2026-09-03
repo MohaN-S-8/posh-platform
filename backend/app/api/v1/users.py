@@ -28,9 +28,9 @@ ROLE_CREATE_FLOW = {
         ROLE_HR_IC,
         ROLE_EMPLOYEE,
     },
-    ROLE_COMPANY_ADMIN: {ROLE_CLIENT_MANAGEMENT},
+    ROLE_COMPANY_ADMIN: {ROLE_CLIENT_MANAGEMENT, ROLE_HR_IC, ROLE_EMPLOYEE},
     ROLE_CLIENT_MANAGEMENT: {ROLE_HR_IC, ROLE_EMPLOYEE},
-    ROLE_HR_IC: {ROLE_EMPLOYEE},
+    ROLE_HR_IC: set(),
 }
 
 ROLE_VISIBLE_FLOW = {
@@ -41,9 +41,9 @@ ROLE_VISIBLE_FLOW = {
         ROLE_HR_IC,
         ROLE_EMPLOYEE,
     },
-    ROLE_COMPANY_ADMIN: {ROLE_CLIENT_MANAGEMENT},
+    ROLE_COMPANY_ADMIN: {ROLE_CLIENT_MANAGEMENT, ROLE_HR_IC, ROLE_EMPLOYEE},
     ROLE_CLIENT_MANAGEMENT: {ROLE_HR_IC, ROLE_EMPLOYEE},
-    ROLE_HR_IC: {ROLE_EMPLOYEE},
+    ROLE_HR_IC: set(),
 }
 
 
@@ -87,9 +87,7 @@ async def _ensure_can_manage_user(db: AsyncSession, current_user, target) -> Non
         )
 
 
-async def _ensure_can_create_in_company(
-    db: AsyncSession, current_user, company_id: int
-) -> None:
+async def _ensure_can_create_in_company(db: AsyncSession, current_user, company_id: int) -> None:
     from fastapi import HTTPException
 
     visible_company_ids = await _visible_company_ids(db, current_user)
@@ -156,11 +154,7 @@ async def get_user(
     user = await user_service.get_by_id(
         db,
         user_id,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await _ensure_can_manage_user(db, current_user, user)
     return user
@@ -178,11 +172,7 @@ async def update_user(
     existing = await user_service.get_by_id(
         db,
         user_id,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await _ensure_can_manage_user(db, current_user, existing)
     if data.role_id is not None:
@@ -191,11 +181,7 @@ async def update_user(
         db,
         user_id,
         data,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await write_audit_log(
         db,
@@ -226,22 +212,14 @@ async def update_user_status(
     existing = await user_service.get_by_id(
         db,
         user_id,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await _ensure_can_manage_user(db, current_user, existing)
     result = await user_service.set_status(
         db,
         user_id,
         status,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await write_audit_log(
         db,
@@ -268,22 +246,14 @@ async def admin_reset_password(
     existing = await user_service.get_by_id(
         db,
         user_id,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await _ensure_can_manage_user(db, current_user, existing)
     result = await user_service.reset_password(
         db,
         user_id,
         data.new_password,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await write_audit_log(
         db,
@@ -309,21 +279,13 @@ async def delete_user(
     existing = await user_service.get_by_id(
         db,
         user_id,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await _ensure_can_manage_user(db, current_user, existing)
     result = await user_service.delete(
         db,
         user_id,
-        (
-            None
-            if current_user.role_id == ROLE_COMPANY_ADMIN
-            else _managed_company_id(current_user)
-        ),
+        (None if current_user.role_id == ROLE_COMPANY_ADMIN else _managed_company_id(current_user)),
     )
     await write_audit_log(
         db,

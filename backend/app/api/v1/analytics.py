@@ -22,9 +22,7 @@ async def _platform_overview(db: AsyncSession) -> dict:
         return result.scalar() or 0
 
     async def grouped_counts(column, *conditions) -> dict:
-        result = await db.execute(
-            select(column, func.count()).where(*conditions).group_by(column)
-        )
+        result = await db.execute(select(column, func.count()).where(*conditions).group_by(column))
         return {str(key or "Unassigned"): value for key, value in result.all()}
 
     companies_result = await db.execute(
@@ -35,15 +33,11 @@ async def _platform_overview(db: AsyncSession) -> dict:
     total_companies = companies_result.scalar() or 0
 
     users_result = await db.execute(
-        select(func.count()).where(
-            UserMaster.is_deleted == "N", UserMaster.status == "Active"
-        )
+        select(func.count()).where(UserMaster.is_deleted == "N", UserMaster.status == "Active")
     )
     total_users = users_result.scalar() or 0
 
-    certs_result = await db.execute(
-        select(func.count()).where(Certificate.status == "Valid")
-    )
+    certs_result = await db.execute(select(func.count()).where(Certificate.status == "Valid"))
     total_certificates = certs_result.scalar() or 0
 
     completions_result = await db.execute(
@@ -52,9 +46,7 @@ async def _platform_overview(db: AsyncSession) -> dict:
     total_completions = completions_result.scalar() or 0
 
     avg_score_result = await db.execute(
-        select(func.avg(AssessmentResult.score)).where(
-            AssessmentResult.result == "Pass"
-        )
+        select(func.avg(AssessmentResult.score)).where(AssessmentResult.result == "Pass")
     )
     avg_score = round(float(avg_score_result.scalar() or 0), 2)
     role_counts = await grouped_counts(
@@ -114,13 +106,9 @@ async def _platform_overview(db: AsyncSession) -> dict:
         )
     )
     completed_users = completed_users_result.scalar() or 0
-    assignments_result = await db.execute(
-        select(func.count()).select_from(CourseAssignment)
-    )
+    assignments_result = await db.execute(select(func.count()).select_from(CourseAssignment))
     total_assignments = assignments_result.scalar() or 0
-    compliance_rate = (
-        round((completed_users / total_employees * 100), 2) if total_employees else 0
-    )
+    compliance_rate = round((completed_users / total_employees * 100), 2) if total_employees else 0
     company_rows = (
         await db.execute(
             select(
@@ -168,12 +156,9 @@ async def _platform_overview(db: AsyncSession) -> dict:
         if not isinstance(scopes, list):
             scopes = []
         service_codes = [
-            str(scope or "Unassigned").strip().upper() or "Unassigned"
-            for scope in scopes
+            str(scope or "Unassigned").strip().upper() or "Unassigned" for scope in scopes
         ]
-        service_codes = [
-            service_code for service_code in service_codes if service_code == "POSH"
-        ]
+        service_codes = [service_code for service_code in service_codes if service_code == "POSH"]
         employee_count = employees_by_company.get(company_id, 0)
         certificate_count = certificates_by_company.get(company_id, 0)
         for service_code in service_codes:
@@ -333,9 +318,7 @@ async def _company_overview(db: AsyncSession, company_id: int) -> dict:
     avg_score_result = await db.execute(
         select(func.avg(AssessmentResult.score)).where(
             AssessmentResult.video_id.in_(
-                select(TrainingHistory.video_id).where(
-                    TrainingHistory.company_id == company_id
-                )
+                select(TrainingHistory.video_id).where(TrainingHistory.company_id == company_id)
             ),
             AssessmentResult.result == "Pass",
         )

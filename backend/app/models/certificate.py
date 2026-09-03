@@ -29,9 +29,7 @@ class CertificateTemplate(Base):
     signature_path = Column(String(255))  # path in MinIO
     color_code = Column(String(20), default="#1a3c5e")
     company_id = Column(Integer, ForeignKey("company_master.company_id"))
-    status = Column(
-        Enum("Pending", "Active", "Inactive", "Rejected"), default="Pending"
-    )
+    status = Column(Enum("Pending", "Active", "Inactive", "Rejected"), default="Pending")
     created_date = Column(DateTime, server_default=func.now())
     updated_date = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -48,9 +46,7 @@ class Certificate(Base):
     user_id = Column(BigInteger, ForeignKey("user_master.user_id"))
     video_id = Column(Integer, ForeignKey("video_master.video_id"), nullable=True)
     company_id = Column(Integer, ForeignKey("company_master.company_id"))
-    template_id = Column(
-        Integer, ForeignKey("certificate_template.template_id"), nullable=True
-    )
+    template_id = Column(Integer, ForeignKey("certificate_template.template_id"), nullable=True)
     certificate_number = Column(String(100), unique=True)  # e.g. POSH-2026-000123
     course_name = Column(String(200))
     completion_date = Column(Date)

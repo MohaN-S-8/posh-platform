@@ -27,14 +27,10 @@ LOCKOUT_MINUTES = 15
 
 
 class AuthService:
-    async def _permission_keys_for_role(
-        self, db: AsyncSession, role_id: int
-    ) -> list[str]:
+    async def _permission_keys_for_role(self, db: AsyncSession, role_id: int) -> list[str]:
         if role_id == 1:
             result = await db.execute(
-                text(
-                    "SELECT permission_key FROM permission_master ORDER BY permission_key"
-                )
+                text("SELECT permission_key FROM permission_master ORDER BY permission_key")
             )
         else:
             result = await db.execute(
@@ -53,9 +49,7 @@ class AuthService:
 
     async def signup(self, db: AsyncSession, data: SignupRequest) -> dict:
         # Check duplicate email
-        result = await db.execute(
-            select(UserMaster).where(UserMaster.email == data.email.lower())
-        )
+        result = await db.execute(select(UserMaster).where(UserMaster.email == data.email.lower()))
         if result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -129,19 +123,13 @@ class AuthService:
 
         otp_record.verified = True
         await db.execute(
-            update(UserMaster)
-            .where(UserMaster.email == email.lower())
-            .values(status="Active")
+            update(UserMaster).where(UserMaster.email == email.lower()).values(status="Active")
         )
         await db.commit()
         return {"message": "Registration completed successfully."}
 
-    async def login(
-        self, db: AsyncSession, data: LoginRequest, ip_address: str
-    ) -> dict:
-        result = await db.execute(
-            select(UserMaster).where(UserMaster.email == data.email.lower())
-        )
+    async def login(self, db: AsyncSession, data: LoginRequest, ip_address: str) -> dict:
+        result = await db.execute(select(UserMaster).where(UserMaster.email == data.email.lower()))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -156,17 +144,9 @@ class AuthService:
         )
         lockout = lockout_result.scalar_one_or_none()
 
-        if (
-            lockout
-            and lockout.locked_until
-            and lockout.locked_until > datetime.now(timezone.utc)
-        ):
+        if lockout and lockout.locked_until and lockout.locked_until > datetime.now(timezone.utc):
             minutes_left = (
-                int(
-                    (lockout.locked_until - datetime.now(timezone.utc)).total_seconds()
-                    / 60
-                )
-                + 1
+                int((lockout.locked_until - datetime.now(timezone.utc)).total_seconds() / 60) + 1
             )
             await self._log_attempt(db, user.user_id, data.email, ip_address, False)
             await db.commit()
@@ -311,9 +291,7 @@ class AuthService:
         lockout.failed_attempts = (lockout.failed_attempts or 0) + 1
 
         if lockout.failed_attempts >= MAX_FAILED_ATTEMPTS:
-            lockout.locked_until = datetime.now(timezone.utc) + timedelta(
-                minutes=LOCKOUT_MINUTES
-            )
+            lockout.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
 
     async def logout(
         self,
@@ -422,16 +400,12 @@ class AuthService:
         """Send password reset link to email."""
         from app.models.auth import PasswordResetTokens
 
-        result = await db.execute(
-            select(UserMaster).where(UserMaster.email == email.lower())
-        )
+        result = await db.execute(select(UserMaster).where(UserMaster.email == email.lower()))
         user = result.scalar_one_or_none()
 
         # Always return same message — don't reveal if email exists (security)
         if not user:
-            return {
-                "message": "If this email is registered, you will receive reset instructions."
-            }
+            return {"message": "If this email is registered, you will receive reset instructions."}
 
         # Generate reset token
         raw_token, token_hash = create_refresh_token()  # reuse same logic
@@ -455,13 +429,9 @@ class AuthService:
         except Exception:
             pass
 
-        return {
-            "message": "If this email is registered, you will receive reset instructions."
-        }
+        return {"message": "If this email is registered, you will receive reset instructions."}
 
-    async def reset_password(
-        self, db: AsyncSession, token: str, new_password: str
-    ) -> dict:
+    async def reset_password(self, db: AsyncSession, token: str, new_password: str) -> dict:
         """Reset password using the token from email."""
         import hashlib
 
@@ -501,16 +471,12 @@ class AuthService:
     async def change_password(
         self, db: AsyncSession, user_id: int, current_password: str, new_password: str
     ) -> dict:
-        result = await db.execute(
-            select(UserMaster).where(UserMaster.user_id == user_id)
-        )
+        result = await db.execute(select(UserMaster).where(UserMaster.user_id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
         if not verify_password(current_password, user.password_hash):
-            raise HTTPException(
-                status_code=400, detail="Current password is incorrect."
-            )
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
         user.password_hash = hash_password(new_password)
         await db.commit()
         return {"message": "Password changed successfully."}

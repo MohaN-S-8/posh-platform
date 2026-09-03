@@ -19,9 +19,7 @@ def get_storage_client():
             "s3",
             endpoint_url=_endpoint_url(os.environ.get("MINIO_ENDPOINT", "minio:9000")),
             aws_access_key_id=os.environ.get("MINIO_ROOT_USER", "minioadmin"),
-            aws_secret_access_key=os.environ.get(
-                "MINIO_ROOT_PASSWORD", "minioadmin123"
-            ),
+            aws_secret_access_key=os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123"),
             config=Config(signature_version="s3v4"),
             region_name="us-east-1",
         )
@@ -40,9 +38,7 @@ def get_presign_client():
             "s3",
             endpoint_url=_endpoint_url(endpoint),
             aws_access_key_id=os.environ.get("MINIO_ROOT_USER", "minioadmin"),
-            aws_secret_access_key=os.environ.get(
-                "MINIO_ROOT_PASSWORD", "minioadmin123"
-            ),
+            aws_secret_access_key=os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123"),
             config=Config(signature_version="s3v4"),
             region_name="us-east-1",
         )
@@ -76,9 +72,7 @@ def upload_file(
     return object_key
 
 
-def generate_presigned_url(
-    bucket: str, object_key: str, expiry_seconds: int = 300
-) -> str:
+def generate_presigned_url(bucket: str, object_key: str, expiry_seconds: int = 300) -> str:
     """Generate a short-lived signed URL for secure browser access."""
     client = get_presign_client()
     return client.generate_presigned_url(

@@ -189,10 +189,7 @@ class UserService:
                     detail="Username already registered.",
                 )
 
-        if (
-            "employee_id" in update_data
-            and update_data["employee_id"] != user.employee_id
-        ):
+        if "employee_id" in update_data and update_data["employee_id"] != user.employee_id:
             existing = await db.execute(
                 select(UserMaster).where(
                     UserMaster.employee_id == update_data["employee_id"],
@@ -302,15 +299,11 @@ class UserService:
             await db.execute(text(statement), params)
 
         await db.execute(
-            text(
-                "UPDATE user_master SET manager_id = NULL WHERE manager_id = :user_id"
-            ),
+            text("UPDATE user_master SET manager_id = NULL WHERE manager_id = :user_id"),
             {"user_id": user_id},
         )
         await db.execute(
-            text(
-                "UPDATE video_master SET created_by = NULL WHERE created_by = :user_id"
-            ),
+            text("UPDATE video_master SET created_by = NULL WHERE created_by = :user_id"),
             {"user_id": user_id},
         )
         await db.execute(

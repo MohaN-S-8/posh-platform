@@ -73,9 +73,7 @@ def upgrade() -> None:
     )
     op.create_table(
         "certificates",
-        sa.Column(
-            "certificate_id", sa.BigInteger(), autoincrement=True, nullable=False
-        ),
+        sa.Column("certificate_id", sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column("user_id", sa.BigInteger(), nullable=True),
         sa.Column("company_id", sa.Integer(), nullable=True),
         sa.Column("template_id", sa.Integer(), nullable=True),

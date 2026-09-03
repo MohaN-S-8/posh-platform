@@ -55,9 +55,7 @@ class HRService:
             .order_by(UserMaster.first_name, UserMaster.last_name)
         )
         employees = result.scalars().all()
-        departments = sorted(
-            {employee.department for employee in employees if employee.department}
-        )
+        departments = sorted({employee.department for employee in employees if employee.department})
         return {
             "employees": [
                 {
@@ -132,9 +130,7 @@ class HRService:
                     detail="Unsupported file type. Please upload .xlsx or .csv",
                 )
         except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Could not read file: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"Could not read file: {str(e)}")
 
         # 2. Normalize column names (lowercase, strip spaces)
         df.columns = [str(c).lower().strip() for c in df.columns]
@@ -211,9 +207,7 @@ class HRService:
                 continue
 
             # ── Check duplicate email ──────────────────────────────────────
-            existing = await db.execute(
-                select(UserMaster).where(UserMaster.email == email)
-            )
+            existing = await db.execute(select(UserMaster).where(UserMaster.email == email))
             if existing.scalar_one_or_none():
                 errors.append(
                     {
@@ -292,9 +286,7 @@ class HRService:
 
         if data.assign_type == "Individual":
             if not data.assigned_to_user_id:
-                raise HTTPException(
-                    400, "assigned_to_user_id required for Individual assignment"
-                )
+                raise HTTPException(400, "assigned_to_user_id required for Individual assignment")
 
             target_result = await db.execute(
                 select(UserMaster).where(
@@ -308,9 +300,7 @@ class HRService:
             if not target_user:
                 raise HTTPException(404, "User not found for this company.")
             if target_user.role_id not in assignable_role_ids:
-                raise HTTPException(
-                    403, "Selected user is not allowed for this video audience."
-                )
+                raise HTTPException(403, "Selected user is not allowed for this video audience.")
 
             # Check already assigned
             existing = await db.execute(
@@ -322,9 +312,7 @@ class HRService:
                 )
             )
             if existing.scalar_one_or_none():
-                raise HTTPException(
-                    400, "This course is already assigned to this employee."
-                )
+                raise HTTPException(400, "This course is already assigned to this employee.")
 
             assignment = CourseAssignment(
                 video_id=data.video_id,
@@ -379,15 +367,12 @@ class HRService:
                 select(CourseAssignment).where(
                     CourseAssignment.video_id == data.video_id,
                     CourseAssignment.company_id == company_id,
-                    CourseAssignment.assigned_to_department
-                    == data.assigned_to_department,
+                    CourseAssignment.assigned_to_department == data.assigned_to_department,
                     CourseAssignment.assign_type == "Department",
                 )
             )
             if existing.scalar_one_or_none():
-                raise HTTPException(
-                    400, "This course is already assigned to this department."
-                )
+                raise HTTPException(400, "This course is already assigned to this department.")
 
             assignment = CourseAssignment(
                 video_id=data.video_id,
@@ -429,9 +414,7 @@ class HRService:
                 )
             )
             if existing.scalar_one_or_none():
-                raise HTTPException(
-                    400, "This course is already assigned company-wide."
-                )
+                raise HTTPException(400, "This course is already assigned company-wide.")
 
             assignment = CourseAssignment(
                 video_id=data.video_id,
@@ -463,18 +446,12 @@ class HRService:
             }
 
         else:
-            raise HTTPException(
-                400, "assign_type must be Individual, Department, or Company-Wide"
-            )
+            raise HTTPException(400, "assign_type must be Individual, Department, or Company-Wide")
 
-    async def get_compliance_dashboard(
-        self, db: AsyncSession, company_id: Optional[int]
-    ) -> dict:
+    async def get_compliance_dashboard(self, db: AsyncSession, company_id: Optional[int]) -> dict:
         """Compliance overview: how many employees completed training."""
 
-        company_filter = (
-            [] if company_id is None else [UserMaster.company_id == company_id]
-        )
+        company_filter = [] if company_id is None else [UserMaster.company_id == company_id]
         history_company_filter = (
             [] if company_id is None else [TrainingHistory.company_id == company_id]
         )
@@ -529,9 +506,7 @@ class HRService:
                 UserMaster.is_deleted == "N",
                 UserMaster.role_id == 4,
             )
-            .group_by(
-                UserMaster.company_id, CompanyMaster.company_name, UserMaster.department
-            )
+            .group_by(UserMaster.company_id, CompanyMaster.company_name, UserMaster.department)
         )
         departments = []
         for row in dept_result:
@@ -581,8 +556,7 @@ class HRService:
                     or_(
                         CourseAssignment.assigned_to_user_id == UserMaster.user_id,
                         and_(
-                            CourseAssignment.assigned_to_department
-                            == UserMaster.department,
+                            CourseAssignment.assigned_to_department == UserMaster.department,
                             CourseAssignment.assign_type == "Department",
                         ),
                         CourseAssignment.assign_type == "Company-Wide",
@@ -616,14 +590,10 @@ class HRService:
             "overdue_employees": overdue,
         }
 
-    async def generate_employee_report(
-        self, db: AsyncSession, company_id: Optional[int]
-    ) -> bytes:
+    async def generate_employee_report(self, db: AsyncSession, company_id: Optional[int]) -> bytes:
         """Generate an Excel report of employee training status."""
 
-        company_filter = (
-            [] if company_id is None else [UserMaster.company_id == company_id]
-        )
+        company_filter = [] if company_id is None else [UserMaster.company_id == company_id]
         result = await db.execute(
             select(
                 CompanyMaster.company_name,
@@ -673,9 +643,7 @@ class HRService:
             worksheet = writer.sheets["Employee Training Report"]
             for col in worksheet.columns:
                 max_length = max(len(str(cell.value or "")) for cell in col)
-                worksheet.column_dimensions[col[0].column_letter].width = min(
-                    max_length + 2, 50
-                )
+                worksheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
 
         output.seek(0)
         return output.read()
@@ -706,9 +674,7 @@ class HRService:
             worksheet = writer.sheets["Department Compliance"]
             for col in worksheet.columns:
                 max_length = max(len(str(cell.value or "")) for cell in col)
-                worksheet.column_dimensions[col[0].column_letter].width = min(
-                    max_length + 2, 50
-                )
+                worksheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
 
         output.seek(0)
         return output.read()
@@ -718,9 +684,7 @@ class HRService:
     ) -> bytes:
         """Generate an Excel report of issued certificates."""
 
-        certificate_filter = (
-            [] if company_id is None else [Certificate.company_id == company_id]
-        )
+        certificate_filter = [] if company_id is None else [Certificate.company_id == company_id]
         result = await db.execute(
             select(
                 CompanyMaster.company_name,
@@ -767,9 +731,7 @@ class HRService:
             worksheet = writer.sheets["Certificates"]
             for col in worksheet.columns:
                 max_length = max(len(str(cell.value or "")) for cell in col)
-                worksheet.column_dimensions[col[0].column_letter].width = min(
-                    max_length + 2, 50
-                )
+                worksheet.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
 
         output.seek(0)
         return output.read()
@@ -823,49 +785,37 @@ class HRService:
     async def generate_employee_report_csv(
         self, db: AsyncSession, company_id: Optional[int]
     ) -> bytes:
-        df = await self._read_excel_report(
-            await self.generate_employee_report(db, company_id)
-        )
+        df = await self._read_excel_report(await self.generate_employee_report(db, company_id))
         return self._dataframe_to_csv(df)
 
     async def generate_department_report_csv(
         self, db: AsyncSession, company_id: Optional[int]
     ) -> bytes:
-        df = await self._read_excel_report(
-            await self.generate_department_report(db, company_id)
-        )
+        df = await self._read_excel_report(await self.generate_department_report(db, company_id))
         return self._dataframe_to_csv(df)
 
     async def generate_certificate_report_csv(
         self, db: AsyncSession, company_id: Optional[int]
     ) -> bytes:
-        df = await self._read_excel_report(
-            await self.generate_certificate_report(db, company_id)
-        )
+        df = await self._read_excel_report(await self.generate_certificate_report(db, company_id))
         return self._dataframe_to_csv(df)
 
     async def generate_employee_report_pdf(
         self, db: AsyncSession, company_id: Optional[int]
     ) -> bytes:
-        df = await self._read_excel_report(
-            await self.generate_employee_report(db, company_id)
-        )
+        df = await self._read_excel_report(await self.generate_employee_report(db, company_id))
         return self._dataframe_to_pdf(df, "Employee Training Report")
 
     async def generate_department_report_pdf(
         self, db: AsyncSession, company_id: Optional[int]
     ) -> bytes:
-        df = await self._read_excel_report(
-            await self.generate_department_report(db, company_id)
-        )
+        df = await self._read_excel_report(await self.generate_department_report(db, company_id))
         return self._dataframe_to_pdf(df, "Department Compliance Report")
 
     async def generate_certificate_report_pdf(
         self, db: AsyncSession, company_id: Optional[int]
     ) -> bytes:
-        df = await self._read_excel_report(
-            await self.generate_certificate_report(db, company_id)
-        )
+        df = await self._read_excel_report(await self.generate_certificate_report(db, company_id))
         return self._dataframe_to_pdf(df, "Certificate Report")
 
     async def create_training_reminders(
@@ -893,8 +843,7 @@ class HRService:
                         CourseAssignment.assigned_to_user_id == UserMaster.user_id,
                         and_(
                             CourseAssignment.assign_type == "Department",
-                            CourseAssignment.assigned_to_department
-                            == UserMaster.department,
+                            CourseAssignment.assigned_to_department == UserMaster.department,
                         ),
                         CourseAssignment.assign_type == "Company-Wide",
                     ),
@@ -926,9 +875,7 @@ class HRService:
         for row in result:
             due_text = row.due_date.strftime("%Y-%m-%d") if row.due_date else "soon"
             title = "Training reminder"
-            message = (
-                f"{row.title} is due by {due_text}. Please complete your POSH training."
-            )
+            message = f"{row.title} is due by {due_text}. Please complete your POSH training."
             existing = await db.execute(
                 select(Notification.id).where(
                     Notification.user_id == row.user_id,

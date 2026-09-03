@@ -44,9 +44,7 @@ async def create_certificate_template(
             "Only Super Admin, Company Admin, and Client / Management can manage certificate templates.",
         )
     initial_status = "Active" if current_user.role_id == 1 else "Pending"
-    template = await cert_service.create_template(
-        db, data, current_user.company_id, initial_status
-    )
+    template = await cert_service.create_template(db, data, current_user.company_id, initial_status)
     await write_audit_log(
         db,
         user_id=current_user.user_id,
@@ -107,9 +105,7 @@ async def update_certificate_template_status(
     if current_user.role_id != 1:
         raise HTTPException(403, "Only Super Admin can approve certificate templates.")
     if status not in ["Active", "Inactive", "Rejected", "Pending"]:
-        raise HTTPException(
-            400, "Status must be Pending, Active, Inactive, or Rejected."
-        )
+        raise HTTPException(400, "Status must be Pending, Active, Inactive, or Rejected.")
     result = await cert_service.set_template_status(db, template_id, status, None)
     await write_audit_log(
         db,
@@ -124,9 +120,7 @@ async def update_certificate_template_status(
     return result
 
 
-@router.post(
-    "/templates/{template_id}/asset", response_model=CertificateTemplateResponse
-)
+@router.post("/templates/{template_id}/asset", response_model=CertificateTemplateResponse)
 async def upload_certificate_template_asset(
     template_id: int,
     asset_type: str = Form(...),
@@ -199,9 +193,7 @@ async def delete_certificate_template(
 @router.get("/my")
 async def my_certificates(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(
-        require_roles_with_matrix([3, 4], ["Assessment & Certificate"])
-    ),
+    current_user=Depends(require_roles_with_matrix([3, 4], ["Assessment & Certificate"])),
 ):
     """Employee: list all my certificates."""
     return await cert_service.list_user_certificates(db, current_user.user_id)
@@ -211,9 +203,7 @@ async def my_certificates(
 async def download_certificate(
     certificate_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(
-        require_roles_with_matrix([3, 4], ["Assessment & Certificate"])
-    ),
+    current_user=Depends(require_roles_with_matrix([3, 4], ["Assessment & Certificate"])),
 ):
     """Employee: get a signed URL to download a certificate PDF."""
     return await cert_service.get_download_url(db, certificate_id, current_user.user_id)
@@ -268,9 +258,7 @@ async def generate_certificate_manual(
     Manually trigger certificate generation.
     In production this is called automatically after assessment pass.
     """
-    cert = await cert_service.generate_certificate(
-        db, user_id, video_id, current_user.company_id
-    )
+    cert = await cert_service.generate_certificate(db, user_id, video_id, current_user.company_id)
     await write_audit_log(
         db,
         user_id=current_user.user_id,
