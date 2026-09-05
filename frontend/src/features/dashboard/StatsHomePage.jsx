@@ -42,20 +42,26 @@ const roleContent = {
 function metricSet(user, data) {
   if (user?.role_id === 1) {
     return [
-      { label: "Active Companies", value: data?.total_companies ?? 0, trend: "Platform live data" },
-      { label: "Active Users", value: data?.total_users ?? 0, trend: "Across all companies" },
-      { label: "Certificates", value: data?.total_certificates_issued ?? 0, trend: "Issued certificates" },
-      { label: "Completions", value: data?.total_course_completions ?? 0, trend: "Training completions" },
-      { label: "Compliance", value: `${data?.compliance_rate ?? 0}%`, trend: "Completed employees" },
-      { label: "Pending Approvals", value: totalPendingApprovals(data), trend: "Needs Super Admin action" },
+      { label: "Active Clients", value: data?.companies?.active ?? data?.total_companies ?? 0, trend: "Platform live data" },
+      { label: "Active Employees", value: data?.hierarchy?.employees ?? 0, trend: "Across all companies" },
+      { label: "Completed Training", value: data?.total_course_completions ?? 0, trend: "Training completions" },
+      {
+        label: "Completed Pending",
+        value: Math.max((data?.hierarchy?.employees ?? 0) - (data?.training?.completed_users ?? 0), 0),
+        trend: "Not completed yet",
+      },
+      { label: "Annual Returns Completed", value: data?.annual_returns?.completed ?? 0, trend: "Annual return module" },
+      { label: "Annual Returns Pending", value: data?.annual_returns?.pending ?? 0, trend: "Annual return module" },
     ];
   }
   if (user?.role_id === 2) {
     return [
-      { label: "Client Users", value: data?.client_users ?? 0, trend: "Client / Mgmt accounts" },
-      { label: "Active", value: data?.active_client_users ?? 0, trend: "Ready to log in" },
-      { label: "Inactive", value: data?.inactive_client_users ?? 0, trend: "Disabled accounts" },
-      { label: "Company Scope", value: data?.company_scope ?? 0, trend: "Visible companies" },
+      { label: "Active Clients", value: data?.client_management_users ?? data?.total_users ?? 0, trend: "Client / Mgmt accounts" },
+      { label: "Active Employees", value: data?.total_employees ?? 0, trend: "Company records" },
+      { label: "Completed Training", value: data?.completed_training ?? 0, trend: "Training completions" },
+      { label: "Completed Pending", value: (data?.in_progress_training ?? 0) + (data?.not_started_training ?? 0), trend: "Still open" },
+      { label: "Annual Returns Completed", value: data?.annual_returns?.completed ?? 0, trend: "Annual return module" },
+      { label: "Annual Returns Pending", value: data?.annual_returns?.pending ?? 0, trend: "Annual return module" },
     ];
   }
   if (user?.role_id === 3 || user?.role_id === 5) {
@@ -74,19 +80,9 @@ function metricSet(user, data) {
   ];
 }
 
-function totalPendingApprovals(data) {
-  const approvals = data?.approvals || {};
-  return (
-    (approvals.companies_pending || 0) +
-    (approvals.videos_pending || 0) +
-    (approvals.certificate_templates_pending || 0) +
-    (approvals.open_concerns || 0)
-  );
-}
-
 function loadEndpoint(user) {
   if (user?.role_id === 1) return "/analytics/overview";
-  if (user?.role_id === 2) return "/users/";
+  if (user?.role_id === 2) return "/analytics/current";
   if (user?.role_id === 3 || user?.role_id === 5) return "/hr/employees/summary";
   return "/employee/summary";
 }
@@ -123,6 +119,7 @@ export function StatsHomePage() {
   const { user } = useAuthStore();
   const [data, setData] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -162,6 +159,25 @@ export function StatsHomePage() {
   }, [user]);
 
   const metrics = useMemo(() => metricSet(user, data), [data, user]);
+  const organizationRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return (data?.organizations || [])
+      .map((org) => ({
+        ...org,
+        annual_return_status: org.annual_return_status || "Pending",
+      }))
+      .filter((org) => {
+        if (!query) return true;
+        return [
+          org.company_name,
+          org.annual_return_status,
+          org.status,
+          org.approval_status,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+      });
+  }, [data?.organizations, searchQuery]);
   const displayName = profile?.full_name || profile?.first_name || "there";
   const companyName = profile?.company_name || "Your company";
   const superAdminSections = useMemo(() => {
@@ -284,6 +300,48 @@ export function StatsHomePage() {
         ))}
       </section>
 
+      {[1, 2].includes(user?.role_id) && (
+        <section style={sectionStyle}>
+          <div className="portal-section-title">Company Status Search</div>
+          <div style={searchPanelStyle}>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by company name, annual return status, or active status"
+              style={searchInputStyle}
+            />
+          </div>
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  {["Co Name", "Annual Return Status", "Active Status"].map((heading) => (
+                    <th key={heading} style={thStyle}>{heading}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {organizationRows.map((org) => (
+                  <tr key={org.company_id} style={trStyle}>
+                    <td style={tdStyle}>{org.company_name}</td>
+                    <td style={tdStyle}>{org.annual_return_status}</td>
+                    <td style={tdStyle}>{org.status || "-"}</td>
+                  </tr>
+                ))}
+                {!loading && organizationRows.length === 0 && (
+                  <tr style={trStyle}>
+                    <td colSpan={3} style={{ ...tdStyle, color: "var(--portal-muted)", textAlign: "center" }}>
+                      No companies match this search.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {user?.role_id === 1 && (
         <section style={sectionStyle}>
           <div className="portal-section-title">XYZ Hierarchy, Services & Organizations</div>
@@ -352,6 +410,54 @@ export default StatsHomePage;
 
 const sectionStyle = {
   marginTop: "26px",
+};
+
+const searchPanelStyle = {
+  background: "white",
+  border: "1px solid var(--portal-border)",
+  borderRadius: "8px",
+  padding: "12px",
+  marginBottom: "12px",
+};
+
+const searchInputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  border: "1px solid var(--portal-border)",
+  borderRadius: "7px",
+  padding: "10px 12px",
+  fontSize: "14px",
+};
+
+const tableWrapStyle = {
+  background: "white",
+  border: "1px solid var(--portal-border)",
+  borderRadius: "8px",
+  overflowX: "auto",
+};
+
+const tableStyle = {
+  width: "100%",
+  minWidth: "620px",
+  borderCollapse: "collapse",
+};
+
+const thStyle = {
+  padding: "12px",
+  textAlign: "left",
+  background: "#faf8ff",
+  color: "var(--portal-muted)",
+  fontSize: "12px",
+  textTransform: "uppercase",
+};
+
+const trStyle = {
+  borderTop: "1px solid var(--portal-border)",
+};
+
+const tdStyle = {
+  padding: "11px 12px",
+  color: "var(--portal-text)",
 };
 
 const sectionTitleStyle = {

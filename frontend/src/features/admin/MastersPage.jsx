@@ -3,12 +3,13 @@ import PropTypes from "prop-types";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { PortalShell } from "../../components/PortalShell";
+import { useAuthStore } from "../../store/authStore";
 
 const tabs = [
   { key: "Country Code", label: "Country Code", addLabel: "+ Add Country" },
   { key: "State Code", label: "State Code", addLabel: "+ Add State" },
   { key: "City Code", label: "City Code", addLabel: "+ Add City" },
-  { key: "Scope of Work ID", label: "Scope of Work", addLabel: "+ Add Scope" },
+  { key: "Deliverables", label: "Deliverables", addLabel: "+ Add Deliverable" },
   { key: "Office Master", label: "Office Master", addLabel: "+ Add Office" },
 ];
 
@@ -16,7 +17,7 @@ const emptyByTab = {
   "Country Code": { name: "", code: "", description: "" },
   "State Code": { country: "IN", name: "", code: "" },
   "City Code": { country: "IN", state: "", name: "", code: "" },
-  "Scope of Work ID": { name: "", code: "" },
+  Deliverables: { name: "", code: "", description: "" },
 };
 
 const emptyOffice = {
@@ -35,6 +36,7 @@ const parseDescription = (description) => {
 };
 
 export function MastersPage() {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState("Country Code");
   const [rows, setRows] = useState([]);
   const [offices, setOffices] = useState([]);
@@ -71,6 +73,7 @@ export function MastersPage() {
 
   const countries = useMemo(() => byCategory("Country Code"), [byCategory]);
   const states = useMemo(() => byCategory("State Code"), [byCategory]);
+  const readOnly = user?.role_id !== 1;
   const updateDraft = (field, value) => {
     setDrafts((current) => ({
       ...current,
@@ -91,8 +94,8 @@ export function MastersPage() {
     if (activeTab === "City Code") {
       payload = { category: activeTab, name: draft.name, code: draft.code, description: JSON.stringify({ country: draft.country, state: draft.state }), is_active: true };
     }
-    if (activeTab === "Scope of Work ID") {
-      payload = { category: activeTab, name: draft.name, code: draft.code, description: "Scope master", is_active: true };
+    if (activeTab === "Deliverables") {
+      payload = { category: activeTab, name: draft.name, code: draft.code, description: draft.description || "POSH deliverable", is_active: true };
     }
     if (!payload?.name?.trim() || !payload?.code?.trim()) {
       setError("Name and code are required.");
@@ -200,7 +203,7 @@ export function MastersPage() {
   };
 
   return (
-    <PortalShell title="Masters" subtitle="Country, state, city, scope, and office master setup.">
+    <PortalShell title="POSH Masters" subtitle="Country, state, city, deliverables, and POSH office master setup.">
       {error && <div style={errorStyle}>{error}</div>}
       {success && <div style={successStyle}>{success}</div>}
 
@@ -228,6 +231,7 @@ export function MastersPage() {
           onUpdate={updateOffice}
           onDelete={deleteOffice}
           saving={saving}
+          readOnly={readOnly}
         />
       ) : (
         <StandardTab
@@ -241,13 +245,14 @@ export function MastersPage() {
           onUpdate={updateRow}
           onDelete={deleteRow}
           saving={saving}
+          readOnly={readOnly}
         />
       )}
     </PortalShell>
   );
 }
 
-function OfficeMasterTab({ offices, draft, onDraft, onCreate, onUpdate, onDelete, saving }) {
+function OfficeMasterTab({ offices, draft, onDraft, onCreate, onUpdate, onDelete, saving, readOnly }) {
   return (
     <>
       <div style={tableWrapStyle}>
@@ -265,6 +270,7 @@ function OfficeMasterTab({ offices, draft, onDraft, onCreate, onUpdate, onDelete
                 <td style={tdStyle}>
                   <input
                     defaultValue={office.office_name}
+                    readOnly={readOnly}
                     onBlur={(event) => {
                       const value = event.target.value.trim().toUpperCase();
                       if (value && value !== office.office_name) {
@@ -277,6 +283,7 @@ function OfficeMasterTab({ offices, draft, onDraft, onCreate, onUpdate, onDelete
                 <td style={tdStyle}>
                   <input
                     defaultValue={office.office_address}
+                    readOnly={readOnly}
                     onBlur={(event) => {
                       const value = event.target.value.trim();
                       if (value && value !== office.office_address) {
@@ -287,60 +294,74 @@ function OfficeMasterTab({ offices, draft, onDraft, onCreate, onUpdate, onDelete
                   />
                 </td>
                 <td style={tdStyle}>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(office)}
-                    disabled={saving === `office-${office.id}`}
-                    style={deleteButtonStyle}
-                  >
-                    Delete
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => onDelete(office)}
+                      disabled={saving === `office-${office.id}`}
+                      style={deleteButtonStyle}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
-            <tr style={trStyle}>
-              <td style={tdStyle}>
-                <input
-                  value={draft.office_name}
-                  placeholder="Office Name"
-                  onChange={(event) =>
-                    onDraft({ ...draft, office_name: event.target.value.toUpperCase() })
-                  }
-                  style={inputStyle}
-                />
-              </td>
-              <td style={tdStyle}>
-                <input
-                  value={draft.office_address}
-                  placeholder="Office Address"
-                  onChange={(event) =>
-                    onDraft({ ...draft, office_address: event.target.value })
-                  }
-                  style={inputStyle}
-                />
-              </td>
-              <td style={tdStyle} />
-            </tr>
+            {!readOnly && (
+              <tr style={trStyle}>
+                <td style={tdStyle}>
+                  <input
+                    value={draft.office_name}
+                    placeholder="Office Name"
+                    onChange={(event) =>
+                      onDraft({ ...draft, office_name: event.target.value.toUpperCase() })
+                    }
+                    style={inputStyle}
+                  />
+                </td>
+                <td style={tdStyle}>
+                  <input
+                    value={draft.office_address}
+                    placeholder="Office Address"
+                    onChange={(event) =>
+                      onDraft({ ...draft, office_address: event.target.value })
+                    }
+                    style={inputStyle}
+                  />
+                </td>
+                <td style={tdStyle} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <button type="button" onClick={onCreate} disabled={saving === "office-create"} style={primaryButtonStyle}>
-        {saving === "office-create" ? "Adding..." : "+ Add Office"}
-      </button>
+      {!readOnly && (
+        <button type="button" onClick={onCreate} disabled={saving === "office-create"} style={primaryButtonStyle}>
+          {saving === "office-create" ? "Adding..." : "+ Add Office"}
+        </button>
+      )}
     </>
   );
 }
 
-function StandardTab({ activeTab, countries, states, rows, draft, onDraft, onCreate, onUpdate, onDelete, saving }) {
+function StandardTab({ activeTab, countries, states, rows, draft, onDraft, onCreate, onUpdate, onDelete, saving, readOnly }) {
   const isCountry = activeTab === "Country Code";
   const isState = activeTab === "State Code";
   const isCity = activeTab === "City Code";
-  const isScope = activeTab === "Scope of Work ID";
+  const isDeliverable = activeTab === "Deliverables";
+  const nameColumnLabel = isCountry
+    ? "Country Name"
+    : isState
+      ? "State Name"
+      : isDeliverable
+        ? "Deliverable"
+        : "City Name";
   const columns = [
     ...(isState || isCity ? ["Country"] : []),
     ...(isCity ? ["State"] : []),
-    isCountry ? "Country Name" : isState ? "State Name" : isCity ? "City Name" : "Scope of Work",
-    isScope ? "Scope Code" : "Code",
+    nameColumnLabel,
+    "Code",
+    ...(isDeliverable ? ["Description"] : []),
     "",
   ];
 
@@ -361,6 +382,7 @@ function StandardTab({ activeTab, countries, states, rows, draft, onDraft, onCre
                   <td style={tdStyle}>
                     <input
                       defaultValue={row.name}
+                      readOnly={readOnly}
                       onBlur={(e) => {
                         if (e.target.value !== row.name) onUpdate(row, { name: e.target.value });
                       }}
@@ -370,6 +392,7 @@ function StandardTab({ activeTab, countries, states, rows, draft, onDraft, onCre
                   <td style={tdStyle}>
                     <input
                       defaultValue={row.code}
+                      readOnly={readOnly}
                       onBlur={(e) => {
                         const nextCode = e.target.value.toUpperCase();
                         if (nextCode !== row.code) onUpdate(row, { code: nextCode });
@@ -377,12 +400,27 @@ function StandardTab({ activeTab, countries, states, rows, draft, onDraft, onCre
                       style={inputStyle}
                     />
                   </td>
+                  {isDeliverable && (
+                    <td style={tdStyle}>
+                      <input
+                        defaultValue={row.description || ""}
+                        readOnly={readOnly}
+                        onBlur={(e) => {
+                          if (e.target.value !== row.description) onUpdate(row, { description: e.target.value });
+                        }}
+                        style={inputStyle}
+                      />
+                    </td>
+                  )}
                   <td style={tdStyle}>
-                    <button type="button" onClick={() => onDelete(row)} disabled={saving === `row-${row.id}`} style={deleteButtonStyle}>Delete</button>
+                    {!readOnly && (
+                      <button type="button" onClick={() => onDelete(row)} disabled={saving === `row-${row.id}`} style={deleteButtonStyle}>Delete</button>
+                    )}
                   </td>
                 </tr>
               );
             })}
+            {!readOnly && (
             <tr style={trStyle}>
               {(isState || isCity) && (
                 <td style={tdStyle}>
@@ -400,19 +438,27 @@ function StandardTab({ activeTab, countries, states, rows, draft, onDraft, onCre
                 </td>
               )}
               <td style={tdStyle}>
-                <input value={draft.name || ""} placeholder={columns.at(-3) || columns[0]} onChange={(e) => onDraft("name", e.target.value)} style={inputStyle} />
+                <input value={draft.name || ""} placeholder={nameColumnLabel} onChange={(e) => onDraft("name", e.target.value)} style={inputStyle} />
               </td>
               <td style={tdStyle}>
                 <input value={draft.code || ""} placeholder="Code" onChange={(e) => onDraft("code", e.target.value.toUpperCase())} style={inputStyle} />
               </td>
+              {isDeliverable && (
+                <td style={tdStyle}>
+                  <input value={draft.description || ""} placeholder="Description" onChange={(e) => onDraft("description", e.target.value)} style={inputStyle} />
+                </td>
+              )}
               <td style={tdStyle} />
             </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <button type="button" onClick={onCreate} disabled={saving === "create"} style={primaryButtonStyle}>
-        {tabs.find((tab) => tab.key === activeTab)?.addLabel}
-      </button>
+      {!readOnly && (
+        <button type="button" onClick={onCreate} disabled={saving === "create"} style={primaryButtonStyle}>
+          {tabs.find((tab) => tab.key === activeTab)?.addLabel}
+        </button>
+      )}
     </>
   );
 }
@@ -443,12 +489,14 @@ StandardTab.propTypes = {
     state: PropTypes.string,
     name: PropTypes.string,
     code: PropTypes.string,
+    description: PropTypes.string,
   }).isRequired,
   onDraft: PropTypes.func.isRequired,
   onCreate: PropTypes.func.isRequired,
   onUpdate: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   saving: PropTypes.string.isRequired,
+  readOnly: PropTypes.bool.isRequired,
 };
 
 OfficeMasterTab.propTypes = {
@@ -463,6 +511,7 @@ OfficeMasterTab.propTypes = {
   onUpdate: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   saving: PropTypes.string.isRequired,
+  readOnly: PropTypes.bool.isRequired,
 };
 
 const tabBarStyle = {

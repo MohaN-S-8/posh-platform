@@ -43,6 +43,9 @@ const emptyForm = {
   employee_strength: "",
   registration_number: "",
   gst_number: "",
+  posh_policy: "",
+  posh_policy_version: "",
+  posh_policy_effective_date: "",
   corp_address: emptyAddress,
   billing_address: emptyAddress,
   account_contact: emptyContact,
@@ -59,6 +62,74 @@ const parseJson = (value, fallback) => {
   } catch {
     return fallback;
   }
+};
+
+const parseCsvRows = (text) => {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+};
+
+const parseBranchCsv = (text) => {
+  const rows = parseCsvRows(text);
+  if (!rows.length) return [];
+  const normalizeHeader = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fieldForHeader = {
+    branchname: "branch_name",
+    branchid: "branch_id",
+    address1: "address1",
+    branchaddress1: "address1",
+    address2: "address2",
+    branchaddress2: "address2",
+    city: "city",
+    branchcity: "city",
+    state: "state",
+    branchstate: "state",
+    country: "country",
+    branchcountry: "country",
+  };
+  const headerRow = rows[0].map(normalizeHeader);
+  const hasHeader = headerRow.some((header) => fieldForHeader[header]);
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const fallbackOrder = ["branch_name", "branch_id", "address1", "address2", "city", "state", "country"];
+
+  return dataRows
+    .map((cells) => {
+      const branch = { ...emptyBranch };
+      cells.forEach((value, index) => {
+        const field = hasHeader ? fieldForHeader[headerRow[index]] : fallbackOrder[index];
+        if (field) branch[field] = value;
+      });
+      return branch;
+    })
+    .filter((branch) => Object.values(branch).some((value) => String(value || "").trim()));
 };
 
 const fullNameParts = (name) => {
@@ -143,6 +214,9 @@ export function CompanyRegistrationContent({ embedded = false }) {
       employee_strength: company.employee_strength || "",
       registration_number: company.registration_number || "",
       gst_number: company.gst_number || "",
+      posh_policy: company.posh_policy || "",
+      posh_policy_version: company.posh_policy_version || "",
+      posh_policy_effective_date: company.posh_policy_effective_date || "",
       corp_address: { ...emptyAddress, ...parseJson(company.corp_address_json, {}) },
       billing_address: { ...emptyAddress, ...parseJson(company.billing_address_json, {}) },
       account_contact: { ...emptyContact, ...parseJson(company.account_contact_json, {}) },
@@ -185,6 +259,18 @@ export function CompanyRegistrationContent({ embedded = false }) {
     }));
   };
 
+  const uploadBranches = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseBranchCsv(String(reader.result || ""));
+      if (parsed.length) {
+        setForm((current) => ({ ...current, branches: parsed }));
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const selectContactEmployee = (section, userId) => {
     const employee = employees.find((item) => String(item.id) === String(userId));
     if (!employee) return;
@@ -220,6 +306,9 @@ export function CompanyRegistrationContent({ embedded = false }) {
         employee_strength: form.employee_strength ? Number(form.employee_strength) : null,
         registration_number: form.registration_number,
         gst_number: form.gst_number,
+        posh_policy: form.posh_policy,
+        posh_policy_version: form.posh_policy_version,
+        posh_policy_effective_date: form.posh_policy_effective_date,
         corp_address_json: JSON.stringify(form.corp_address),
         billing_address_json: JSON.stringify(form.billing_address),
         account_contact_json: JSON.stringify(form.account_contact),
@@ -297,8 +386,8 @@ export function CompanyRegistrationContent({ embedded = false }) {
 
             <div style={threeGridStyle}>
               <label style={labelStyle}>
-                Company Type
-                <select value={form.company_type} onChange={(event) => setField("company_type", event.target.value)} style={inputStyle}>
+                Company Type *
+                <select required value={form.company_type} onChange={(event) => setField("company_type", event.target.value)} style={inputStyle}>
                   <option>Limited</option>
                   <option>Proprietor</option>
                   <option>Partnership</option>
@@ -318,6 +407,21 @@ export function CompanyRegistrationContent({ embedded = false }) {
               <label style={labelStyle}>
                 GST No
                 <input value={form.gst_number} onChange={(event) => setField("gst_number", event.target.value)} style={inputStyle} />
+              </label>
+              <label style={labelStyle}>
+                POSH Policy
+                <input value={form.posh_policy} onChange={(event) => setField("posh_policy", event.target.value)} style={inputStyle} />
+              </label>
+              <label style={labelStyle}>
+                Version
+                <input value={form.posh_policy_version} onChange={(event) => setField("posh_policy_version", event.target.value)} style={inputStyle} />
+              </label>
+            </div>
+
+            <div style={threeGridStyle}>
+              <label style={labelStyle}>
+                Approved / Effective Date
+                <input type="date" value={form.posh_policy_effective_date} onChange={(event) => setField("posh_policy_effective_date", event.target.value)} style={inputStyle} />
               </label>
               <label style={labelStyle}>
                 Employee Strength
@@ -374,7 +478,18 @@ export function CompanyRegistrationContent({ embedded = false }) {
             <section style={sectionStyle}>
               <div style={sectionHeaderStyle}>
                 <h4 style={sectionHeadingStyle}>Branches</h4>
-                <button type="button" onClick={addBranch} style={secondaryButtonStyle}>Add Branch</button>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <label style={{ ...secondaryButtonStyle, cursor: "pointer" }}>
+                    Bulk Upload CSV
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(event) => uploadBranches(event.target.files?.[0])}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  <button type="button" onClick={addBranch} style={secondaryButtonStyle}>Add Branch</button>
+                </div>
               </div>
               {form.branches.map((branch, index) => (
                 <div key={`branch-${index}`} style={branchPanelStyle}>
@@ -485,15 +600,16 @@ function AddressSection({ title, section, values, onChange, masterOptions }) {
       <h4 style={sectionHeadingStyle}>{title}</h4>
       <div style={twoGridStyle}>
         <TextInput label="Address Line 1" required value={values.address1} onChange={(value) => onChange(section, "address1", value)} />
-        <TextInput label="Address Line 2" value={values.address2} onChange={(value) => onChange(section, "address2", value)} />
+        <TextInput label="Address Line 2" required value={values.address2} onChange={(value) => onChange(section, "address2", value)} />
+        <TextInput label="Address Line 3" required value={values.address3} onChange={(value) => onChange(section, "address3", value)} />
       </div>
       <div style={fourGridStyle}>
         <TextInput label="City" required list="city-options" value={values.city} onChange={(value) => onChange(section, "city", value)} />
         <TextInput label="State" required list="state-options" value={values.state} onChange={(value) => onChange(section, "state", value)} />
         <TextInput label="Pincode" required value={values.pincode} onChange={(value) => onChange(section, "pincode", value)} />
         <label style={labelStyle}>
-          Country
-          <select value={values.country} onChange={(event) => onChange(section, "country", event.target.value)} style={inputStyle}>
+          Country *
+          <select required value={values.country} onChange={(event) => onChange(section, "country", event.target.value)} style={inputStyle}>
             {masterOptions("Country Code").map((item) => (
               <option key={item.id} value={item.code}>{item.name}</option>
             ))}

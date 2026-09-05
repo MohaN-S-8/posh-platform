@@ -22,6 +22,9 @@ const emptyContact = {
   email: "",
 };
 
+const POSH_SERVICE_CODE = "POSH";
+const POSH_SERVICE_NAME = "PoSH Training & Compliance";
+
 const emptyBranch = {
   branch_name: "",
   branch_id: "",
@@ -36,7 +39,7 @@ const emptyForm = {
   company_code: "",
   company_name: "",
   reference_no: "",
-  company_type: "",
+  company_type: "Limited",
   company_status_type: "Client",
   client_id: "",
   scope_codes_json: "",
@@ -47,6 +50,9 @@ const emptyForm = {
   website: "",
   registration_number: "",
   gst_number: "",
+  posh_policy: "",
+  posh_policy_version: "",
+  posh_policy_effective_date: "",
   employee_strength: "",
   address: "",
   corp_address_json: "",
@@ -76,7 +82,7 @@ const clientDataFields = [
 
 const workOrderFields = [
   ["client_id", "Client ID", "readonly"],
-  ["deliverables", "Deliverables", "deliverables"],
+  ["deliverables", "Deliverables"],
   ["start_date", "Start Date", "date"],
   ["stop_date", "Stop Date", "date"],
   ["frequency", "Frequency", "frequency"],
@@ -106,6 +112,74 @@ const getJsonObject = (form, key, fallback) => {
     : fallback;
 };
 
+const parseCsvRows = (text) => {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+};
+
+const parseBranchCsv = (text) => {
+  const rows = parseCsvRows(text);
+  if (!rows.length) return [];
+  const normalizeHeader = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fieldForHeader = {
+    branchname: "branch_name",
+    branchid: "branch_id",
+    address1: "address1",
+    branchaddress1: "address1",
+    address2: "address2",
+    branchaddress2: "address2",
+    city: "city",
+    branchcity: "city",
+    state: "state",
+    branchstate: "state",
+    country: "country",
+    branchcountry: "country",
+  };
+  const headerRow = rows[0].map(normalizeHeader);
+  const hasHeader = headerRow.some((header) => fieldForHeader[header]);
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const fallbackOrder = ["branch_name", "branch_id", "address1", "address2", "city", "state", "country"];
+
+  return dataRows
+    .map((cells) => {
+      const branch = { ...emptyBranch };
+      cells.forEach((value, index) => {
+        const field = hasHeader ? fieldForHeader[headerRow[index]] : fallbackOrder[index];
+        if (field) branch[field] = value;
+      });
+      return branch;
+    })
+    .filter((branch) => Object.values(branch).some((value) => String(value || "").trim()));
+};
+
 const setJsonObjectValue = (setForm, key, fallback, field, value) => {
   setForm((current) => {
     const row = getJsonObject(current, key, fallback);
@@ -117,21 +191,6 @@ const setJsonArrayValue = (setForm, key, index, field, value) => {
   setForm((current) => {
     const rows = getJsonArray(current, key).map((row) => ({ ...row }));
     rows[index] = { ...rows[index], [field]: value };
-    return { ...current, [key]: JSON.stringify(rows) };
-  });
-};
-
-const toggleJsonArrayMultiValue = (setForm, key, index, field, value) => {
-  setForm((current) => {
-    const rows = getJsonArray(current, key).map((row) => ({ ...row }));
-    const existing = String(rows[index]?.[field] || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    const next = existing.includes(value)
-      ? existing.filter((item) => item !== value)
-      : [...existing, value];
-    rows[index] = { ...rows[index], [field]: next.join(", ") };
     return { ...current, [key]: JSON.stringify(rows) };
   });
 };
@@ -175,6 +234,25 @@ const generateClientIdPreview = (companyCode, scope, sequence) => {
   return `${companyCode}/${scope}/${year}-${sequence}`;
 };
 
+const fixedPoshServiceRows = (form) => {
+  const rows = getJsonArray(form, "service_details_json");
+  const existing =
+    rows.find((row) => row.scope === POSH_SERVICE_CODE) ||
+    rows.find((row) =>
+      ["assigned_to", "start_date", "stop_date", "frequency", "notes", "billing_amount", "deliverables"].some(
+        (field) => row[field],
+      ),
+    ) ||
+    {};
+  return [
+    {
+      ...existing,
+      scope: POSH_SERVICE_CODE,
+      deliverables: existing.deliverables || POSH_SERVICE_NAME,
+    },
+  ];
+};
+
 const nextReferenceNo = (companies) => {
   const year = new Date().getFullYear();
   const maxNumber = companies.reduce((maxValue, company) => {
@@ -206,7 +284,7 @@ export function CompanyListPage() {
       const res = await apiClient.get("/companies/master-codes/");
       setMasters(res.data || []);
     } catch (err) {
-      setError(apiErrorMessage(err, "Failed to load state, city, and scope masters."));
+      setError(apiErrorMessage(err, "Failed to load country, state, and city masters."));
     }
   }, []);
 
@@ -252,43 +330,40 @@ export function CompanyListPage() {
     [masters],
   );
 
-  const scopedDeliverables = useCallback(
-    (scopeCode) =>
-      masterOptions("Deliverables").filter((item) => {
-        const description = parseJson(item.description, {});
-        return !description.scope || description.scope === scopeCode;
-      }),
-    [masterOptions],
-  );
-
-  const normalizePayload = () => ({
-    ...form,
-    reference_no: form.reference_no || nextReferenceNo(companies),
-    company_code: generateCompanyCode(form.company_name),
-    company_type: form.company_type || "Work Order",
-    company_status_type: form.company_status_type || "Client",
-    industry_type: form.industry_type,
-    scope_codes_json: form.scope_codes_json || JSON.stringify([]),
-    service_details_json: form.service_details_json || JSON.stringify([]),
-    corp_address_json: form.corp_address_json || JSON.stringify(emptyAddress),
-    billing_address_json: form.billing_address_json || JSON.stringify(emptyAddress),
-    account_contact_json: form.account_contact_json || JSON.stringify(emptyContact),
-    coordinator_contact_json: form.coordinator_contact_json || JSON.stringify(emptyContact),
-    branches_json: form.branches_json || JSON.stringify([]),
-    employee_strength: form.employee_strength ? Number(form.employee_strength) : null,
-    contact_person:
-      form.contact_person ||
-      getJsonObject(form, "coordinator_contact_json", emptyContact).name ||
-      null,
-    contact_email:
-      form.contact_email ||
-      getJsonObject(form, "coordinator_contact_json", emptyContact).email ||
-      null,
-    contact_mobile:
-      form.contact_mobile ||
-      getJsonObject(form, "coordinator_contact_json", emptyContact).contact_no ||
-      null,
-  });
+  const normalizePayload = () => {
+    const serviceRows = fixedPoshServiceRows(form);
+    return {
+      ...form,
+      reference_no: form.reference_no || nextReferenceNo(companies),
+      company_code: generateCompanyCode(form.company_name),
+      company_type:
+        form.company_type && form.company_type !== "Work Order"
+          ? form.company_type
+          : "Limited",
+      company_status_type: form.company_status_type || "Client",
+      industry_type: form.industry_type,
+      scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
+      service_details_json: JSON.stringify(serviceRows),
+      corp_address_json: form.corp_address_json || JSON.stringify(emptyAddress),
+      billing_address_json: form.billing_address_json || JSON.stringify(emptyAddress),
+      account_contact_json: form.account_contact_json || JSON.stringify(emptyContact),
+      coordinator_contact_json: form.coordinator_contact_json || JSON.stringify(emptyContact),
+      branches_json: form.branches_json || JSON.stringify([]),
+      employee_strength: form.employee_strength ? Number(form.employee_strength) : null,
+      contact_person:
+        form.contact_person ||
+        getJsonObject(form, "coordinator_contact_json", emptyContact).name ||
+        null,
+      contact_email:
+        form.contact_email ||
+        getJsonObject(form, "coordinator_contact_json", emptyContact).email ||
+        null,
+      contact_mobile:
+        form.contact_mobile ||
+        getJsonObject(form, "coordinator_contact_json", emptyContact).contact_no ||
+        null,
+    };
+  };
 
   const handleCompanyNameChange = (value) => {
     const match =
@@ -302,8 +377,8 @@ export function CompanyListPage() {
         ...match,
         company_name: match.company_name,
         company_code: match.company_code,
-        service_details_json: JSON.stringify([{}]),
-        scope_codes_json: "",
+        service_details_json: JSON.stringify(fixedPoshServiceRows(match)),
+        scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
         client_id: "",
         employee_strength: match.employee_strength || "",
       });
@@ -320,7 +395,12 @@ export function CompanyListPage() {
   const openCreate = () => {
     setEditingCompany(null);
     setSelectedExistingCompany(null);
-    setForm({ ...emptyForm, reference_no: nextReferenceNo(companies) });
+    setForm({
+      ...emptyForm,
+      reference_no: nextReferenceNo(companies),
+      service_details_json: JSON.stringify(fixedPoshServiceRows(emptyForm)),
+      scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
+    });
     setShowForm(true);
     setError("");
     setSuccess("");
@@ -333,6 +413,8 @@ export function CompanyListPage() {
       ...emptyForm,
       ...company,
       employee_strength: company.employee_strength || "",
+      service_details_json: JSON.stringify(fixedPoshServiceRows(company)),
+      scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
     });
     setShowForm(true);
     setError("");
@@ -348,16 +430,6 @@ export function CompanyListPage() {
     const generatedCompanyCode = generateCompanyCode(form.company_name);
     if (generatedCompanyCode.length !== 4) {
       setError("Company name must contain at least 4 letters to generate the company code.");
-      return;
-    }
-    const selectedScopes = getJsonArray(form, "service_details_json").filter((row) => row.scope);
-    if (!selectedScopes.length) {
-      setError("Select at least one Scope of Work.");
-      return;
-    }
-    const missingAssignment = selectedScopes.find((row) => !row.assigned_to);
-    if (missingAssignment) {
-      setError("Assign every selected service before submitting.");
       return;
     }
     setSubmitting(true);
@@ -442,20 +514,10 @@ export function CompanyListPage() {
     }
   };
 
-  const toggleScope = (scopeCode) => {
-    setForm((current) => {
-      const rows = getJsonArray(current, "service_details_json").map((row) => ({ ...row }));
-      const exists = rows.some((row) => row.scope === scopeCode);
-      const nextRows = exists
-        ? rows.filter((row) => row.scope !== scopeCode)
-        : [...rows.filter((row) => row.scope), { scope: scopeCode }];
-      return {
-        ...current,
-        scope_codes_json: JSON.stringify(nextRows.map((row) => row.scope)),
-        service_details_json: JSON.stringify(nextRows.length ? nextRows : [{}]),
-      };
-    });
-  };
+  const poshService = fixedPoshServiceRows(form)[0];
+  const poshPreviewClientId =
+    poshService.client_id ||
+    generateClientIdPreview(form.company_code, POSH_SERVICE_CODE, nextClientSequence(companies));
 
   return (
     <PortalShell
@@ -495,13 +557,6 @@ export function CompanyListPage() {
       </datalist>
       <datalist id="city-code-options">
         {masterOptions("City Code").map((item) => (
-          <option key={item.id} value={item.code}>
-            {item.name}
-          </option>
-        ))}
-      </datalist>
-      <datalist id="scope-code-options">
-        {masterOptions("Scope of Work ID").map((item) => (
           <option key={item.id} value={item.code}>
             {item.name}
           </option>
@@ -588,33 +643,9 @@ export function CompanyListPage() {
                   ),
                 )}
               <div style={sectionStyle}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-                  <h4 style={sectionHeadingStyle}>Scope of Work (select one or more)</h4>
-                </div>
-                <div style={scopeGridStyle}>
-                  {masterOptions("Scope of Work ID").map((scope) => {
-                    const selected = getJsonArray(form, "service_details_json").some((row) => row.scope === scope.code);
-                    return (
-                      <label key={scope.id} style={scopeOptionStyle}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleScope(scope.code)}
-                        />
-                        <span>{scope.name}</span>
-                        <small>{scope.code}</small>
-                      </label>
-                    );
-                  })}
-                  {masterOptions("Scope of Work ID").length === 0 && (
-                    <span style={{ color: "var(--portal-muted)", fontSize: "13px" }}>
-                      Add scope values in Masters.
-                    </span>
-                  )}
-                </div>
-                <h4 style={sectionHeadingStyle}>Client Data (per service selected)</h4>
+                <h4 style={sectionHeadingStyle}>Client Data Details</h4>
                 <p style={helperTextStyle}>
-                  Select one or more scopes above to enter Client Data - Start Date, Stop Date, Frequency, Notes, Billing Amount, Assigned To - for each service.
+                  POSH is the only active work-order service.
                 </p>
                 <div style={formGridStyle}>
                   {clientDataFields.map(({ label, key, type = "text", required, options }) => (
@@ -644,75 +675,27 @@ export function CompanyListPage() {
                     </label>
                   ))}
                 </div>
-                {getJsonArray(form, "service_details_json").map((service, serviceIndex) => {
-                  if (!service.scope) return null;
-                  const sequence = nextClientSequence(companies) + serviceIndex;
-                  const previewClientId =
-                    service.client_id ||
-                    generateClientIdPreview(form.company_code, service.scope, sequence);
-                  return (
-                    <div key={`service-${serviceIndex}`} style={panelInsetStyle}>
+                    <div style={panelInsetStyle}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "12px" }}>
                         <strong style={{ color: "var(--portal-purple)" }}>
-                          Service {serviceIndex + 1} {previewClientId ? `- ${previewClientId}` : ""}
+                          {POSH_SERVICE_NAME} {poshPreviewClientId ? `- ${poshPreviewClientId}` : ""}
                         </strong>
-                        {getJsonArray(form, "service_details_json").length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeJsonArrayRow(setForm, "service_details_json", serviceIndex)}
-                            style={secondaryButtonStyle}
-                          >
-                            Remove
-                          </button>
-                        )}
                       </div>
                       <div style={formGridStyle}>
                         {workOrderFields.map(([field, label, type = "text"]) => (
-                          <label key={`work-${serviceIndex}-${field}`} style={labelStyle}>
+                          <label key={`work-posh-${field}`} style={labelStyle}>
                             {label}
                             {type === "readonly" ? (
                               <input
                                 readOnly
-                                value={previewClientId}
+                                value={poshPreviewClientId}
                                 style={{ ...inputStyle, background: "#f7f3ff" }}
                               />
-                            ) : type === "deliverables" ? (
-                              <div style={multiSelectStyle}>
-                                {scopedDeliverables(service.scope).map((item) => {
-                                  const selected = String(service[field] || "")
-                                    .split(",")
-                                    .map((value) => value.trim())
-                                    .filter(Boolean);
-                                  return (
-                                    <label key={item.id} style={multiOptionStyle}>
-                                      <input
-                                        type="checkbox"
-                                        checked={selected.includes(item.code)}
-                                        onChange={() =>
-                                          toggleJsonArrayMultiValue(
-                                            setForm,
-                                            "service_details_json",
-                                            serviceIndex,
-                                            field,
-                                            item.code,
-                                          )
-                                        }
-                                      />
-                                      {item.name} ({item.code})
-                                    </label>
-                                  );
-                                })}
-                                {scopedDeliverables(service.scope).length === 0 && (
-                                  <span style={{ color: "var(--portal-muted)", fontSize: "13px" }}>
-                                    Add deliverables in Masters.
-                                  </span>
-                                )}
-                              </div>
                             ) : type === "frequency" ? (
                               <select
-                                value={service[field] || ""}
+                                value={poshService[field] || ""}
                                 onChange={(e) =>
-                                  setJsonArrayValue(setForm, "service_details_json", serviceIndex, field, e.target.value)
+                                  setJsonArrayValue(setForm, "service_details_json", 0, field, e.target.value)
                                 }
                                 style={inputStyle}
                               >
@@ -725,13 +708,13 @@ export function CompanyListPage() {
                               </select>
                             ) : type === "assigned" ? (
                               <select
-                                value={service[field] || ""}
+                                value={poshService[field] || ""}
                                 onChange={(e) => {
                                   const user = assignableUsers.find((item) => String(item.user_id) === e.target.value);
                                   setForm((current) => {
-                                    const rows = getJsonArray(current, "service_details_json").map((row) => ({ ...row }));
-                                    rows[serviceIndex] = {
-                                      ...rows[serviceIndex],
+                                    const rows = fixedPoshServiceRows(current);
+                                    rows[0] = {
+                                      ...rows[0],
                                       assigned_to: e.target.value,
                                       assigned_to_name: user?.name || "",
                                       assigned_to_role: user?.role_label || "",
@@ -750,12 +733,10 @@ export function CompanyListPage() {
                               </select>
                             ) : (
                               <input
-                                type={type === "scope" ? "text" : type}
-                                list={type === "scope" ? "scope-code-options" : undefined}
-                                readOnly={type === "scope"}
-                                value={service[field] || ""}
+                                type={type}
+                                value={poshService[field] || ""}
                                 onChange={(e) =>
-                                  setJsonArrayValue(setForm, "service_details_json", serviceIndex, field, e.target.value)
+                                  setJsonArrayValue(setForm, "service_details_json", 0, field, e.target.value)
                                 }
                                 style={inputStyle}
                               />
@@ -764,17 +745,16 @@ export function CompanyListPage() {
                         ))}
                       </div>
                     </div>
-                  );
-                })}
               </div>
 
               <div style={sectionStyle}>
                 <h4 style={sectionHeadingStyle}>Company Registration Details</h4>
                 <div style={formGridStyle}>
                   <label style={labelStyle}>
-                    Company Type
+                    Company Type *
                     <select
-                      value={form.company_type || "Limited"}
+                      required
+                      value={form.company_type && form.company_type !== "Work Order" ? form.company_type : "Limited"}
                       onChange={(event) =>
                         setForm({ ...form, company_type: event.target.value })
                       }
@@ -812,6 +792,37 @@ export function CompanyListPage() {
                       value={form.gst_number || ""}
                       onChange={(event) =>
                         setForm({ ...form, gst_number: event.target.value })
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={labelStyle}>
+                    POSH Policy
+                    <input
+                      value={form.posh_policy || ""}
+                      onChange={(event) =>
+                        setForm({ ...form, posh_policy: event.target.value })
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={labelStyle}>
+                    Version
+                    <input
+                      value={form.posh_policy_version || ""}
+                      onChange={(event) =>
+                        setForm({ ...form, posh_policy_version: event.target.value })
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={labelStyle}>
+                    Approved / Effective Date
+                    <input
+                      type="date"
+                      value={form.posh_policy_effective_date || ""}
+                      onChange={(event) =>
+                        setForm({ ...form, posh_policy_effective_date: event.target.value })
                       }
                       style={inputStyle}
                     />
@@ -997,8 +1008,12 @@ function CompanyAddressFields({ title, jsonKey, form, setForm, masterOptions }) 
           <input required value={values.address1 || ""} onChange={(event) => update("address1", event.target.value)} style={inputStyle} />
         </label>
         <label style={labelStyle}>
-          Address Line 2
-          <input value={values.address2 || ""} onChange={(event) => update("address2", event.target.value)} style={inputStyle} />
+          Address Line 2 *
+          <input required value={values.address2 || ""} onChange={(event) => update("address2", event.target.value)} style={inputStyle} />
+        </label>
+        <label style={labelStyle}>
+          Address Line 3 *
+          <input required value={values.address3 || ""} onChange={(event) => update("address3", event.target.value)} style={inputStyle} />
         </label>
         <label style={labelStyle}>
           City *
@@ -1013,8 +1028,8 @@ function CompanyAddressFields({ title, jsonKey, form, setForm, masterOptions }) 
           <input required value={values.pincode || ""} onChange={(event) => update("pincode", event.target.value)} style={inputStyle} />
         </label>
         <label style={labelStyle}>
-          Country
-          <select value={values.country || "IN"} onChange={(event) => update("country", event.target.value)} style={inputStyle}>
+          Country *
+          <select required value={values.country || "IN"} onChange={(event) => update("country", event.target.value)} style={inputStyle}>
             {masterOptions("Country Code").map((item) => (
               <option key={item.id} value={item.code}>{item.name}</option>
             ))}
@@ -1063,17 +1078,40 @@ function CompanyContactFields({ title, jsonKey, form, setForm, onContactSync }) 
 
 function CompanyBranchFields({ form, setForm }) {
   const branches = getJsonArray(form, "branches_json");
+  const uploadBranches = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseBranchCsv(String(reader.result || ""));
+      if (parsed.length) {
+        setForm((current) => ({ ...current, branches_json: JSON.stringify(parsed) }));
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div style={panelInsetStyle}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "12px" }}>
         <h4 style={sectionHeadingStyle}>Branches</h4>
-        <button
-          type="button"
-          onClick={() => addJsonArrayRow(setForm, "branches_json", emptyBranch)}
-          style={secondaryButtonStyle}
-        >
-          Add Branch
-        </button>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <label style={{ ...secondaryButtonStyle, cursor: "pointer" }}>
+            Bulk Upload CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(event) => uploadBranches(event.target.files?.[0])}
+              style={{ display: "none" }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => addJsonArrayRow(setForm, "branches_json", emptyBranch)}
+            style={secondaryButtonStyle}
+          >
+            Add Branch
+          </button>
+        </div>
       </div>
       {branches.map((branch, index) => (
         <div key={`branch-${index}`} style={{ ...panelInsetStyle, background: "white", marginBottom: "12px" }}>
@@ -1209,26 +1247,6 @@ const helperTextStyle = {
   lineHeight: 1.5,
 };
 
-const scopeGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: "12px",
-  marginBottom: "12px",
-};
-
-const scopeOptionStyle = {
-  display: "grid",
-  gridTemplateColumns: "auto 1fr",
-  gap: "8px",
-  alignItems: "center",
-  border: "1px solid var(--portal-border)",
-  borderRadius: "8px",
-  padding: "12px",
-  background: "#faf8ff",
-  color: "var(--portal-text)",
-  fontWeight: 700,
-};
-
 const tableHeadingStyle = {
   margin: "26px 0 12px",
   color: "var(--portal-purple)",
@@ -1261,25 +1279,6 @@ const inputStyle = {
   boxSizing: "border-box",
   color: "var(--portal-text)",
   background: "white",
-};
-
-const multiSelectStyle = {
-  display: "grid",
-  gap: "8px",
-  minHeight: "42px",
-  padding: "10px",
-  border: "1px solid var(--portal-border)",
-  borderRadius: "6px",
-  background: "white",
-};
-
-const multiOptionStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  color: "var(--portal-text)",
-  fontSize: "13px",
-  fontWeight: 600,
 };
 
 const primaryButtonStyle = {
