@@ -107,7 +107,7 @@ export function EmployeeDashboard() {
 
   const modules = [
     {
-      title: "Video Courses",
+      title: "PoSH Training",
       description: "Watch published POSH training videos and resume from saved progress.",
       path: "/employee/courses",
       icon: <PlayCircleIcon />,

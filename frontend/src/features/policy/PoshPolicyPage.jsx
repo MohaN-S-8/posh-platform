@@ -130,7 +130,10 @@ export function PoshPolicyPage() {
   const [downloadingDoc, setDownloadingDoc] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const canEdit = user?.role_id === 1 || user?.role_id === 2;
+  const [acknowledgements, setAcknowledgements] = useState([]);
+  const canEdit = user?.role_id === 1 || user?.role_id === 2 || user?.role_id === 5;
+  const canViewAcknowledgements = user?.role_id === 1 || user?.role_id === 2;
+  const canAcknowledge = !canEdit;
 
   useEffect(() => {
     let active = true;
@@ -158,6 +161,23 @@ export function PoshPolicyPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canViewAcknowledgements) return undefined;
+    let active = true;
+    const loadAcknowledgements = async () => {
+      try {
+        const res = await apiClient.get("/policy/acknowledgements");
+        if (active) setAcknowledgements(res.data || []);
+      } catch {
+        if (active) setAcknowledgements([]);
+      }
+    };
+    loadAcknowledgements();
+    return () => {
+      active = false;
+    };
+  }, [canViewAcknowledgements]);
 
   const savePolicy = async (event) => {
     event.preventDefault();
@@ -211,6 +231,22 @@ export function PoshPolicyPage() {
       setError(apiErrorMessage(err, "Policy document has not been uploaded yet."));
     } finally {
       setDownloadingDoc(false);
+    }
+  };
+
+  const acknowledgePolicy = async () => {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await apiClient.post("/policy/acknowledge");
+      setPolicy((current) => ({ ...current, acknowledged: true }));
+      setMessage("Policy acknowledged. Your training is now available.");
+      window.dispatchEvent(new Event("posh-policy-acknowledged"));
+    } catch (err) {
+      setError(apiErrorMessage(err, "Unable to acknowledge policy."));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -401,6 +437,67 @@ export function PoshPolicyPage() {
         </article>
       </section>
 
+      {canAcknowledge && (
+        <section className="portal-card portal-policy-ack">
+          <div>
+            <strong>{policy.acknowledged ? "Policy acknowledged" : "Acknowledge PoSH Policy"}</strong>
+            <p>
+              {policy.acknowledged
+                ? "Your acknowledgement is recorded for this policy version."
+                : "You must acknowledge this policy before employee training is available."}
+            </p>
+          </div>
+          <button
+            type="button"
+            className={policy.acknowledged ? "portal-outline-btn" : "portal-primary-btn"}
+            disabled={saving || policy.acknowledged}
+            onClick={acknowledgePolicy}
+          >
+            <CheckCircleIcon fontSize="small" />
+            {policy.acknowledged ? "Acknowledged" : "I Acknowledge"}
+          </button>
+        </section>
+      )}
+
+      {canViewAcknowledgements && (
+        <section style={{ marginBottom: "24px" }}>
+          <div className="portal-section-title">Policy Acknowledgements</div>
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  {["Employee", "Email", "Company", "Version", "Acknowledged At"].map((heading) => (
+                    <th key={heading} style={thStyle}>{heading}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {acknowledgements.map((row) => (
+                  <tr key={`${row.user_id}-${row.policy_id}-${row.policy_version}`} style={trStyle}>
+                    <td style={tdStyle}>{row.full_name || row.employee_id || "-"}</td>
+                    <td style={tdStyle}>{row.email}</td>
+                    <td style={tdStyle}>{row.company_name || "Global"}</td>
+                    <td style={tdStyle}>{row.policy_version || "-"}</td>
+                    <td style={tdStyle}>
+                      {row.acknowledged_at
+                        ? new Date(row.acknowledged_at).toLocaleString()
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+                {!acknowledgements.length && (
+                  <tr style={trStyle}>
+                    <td colSpan={5} style={{ ...tdStyle, textAlign: "center", color: "var(--portal-muted)" }}>
+                      No acknowledgements recorded yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section>
         <div className="portal-section-title">Frequently Asked Questions</div>
         <div className="portal-policy-faq-list">
@@ -430,3 +527,34 @@ export function PoshPolicyPage() {
     </PortalShell>
   );
 }
+
+const tableWrapStyle = {
+  background: "white",
+  border: "1px solid var(--portal-border)",
+  borderRadius: "8px",
+  overflowX: "auto",
+};
+
+const tableStyle = {
+  width: "100%",
+  minWidth: "760px",
+  borderCollapse: "collapse",
+};
+
+const thStyle = {
+  padding: "12px",
+  textAlign: "left",
+  background: "#faf8ff",
+  color: "var(--portal-muted)",
+  fontSize: "12px",
+  textTransform: "uppercase",
+};
+
+const trStyle = {
+  borderTop: "1px solid var(--portal-border)",
+};
+
+const tdStyle = {
+  padding: "11px 12px",
+  color: "var(--portal-text)",
+};

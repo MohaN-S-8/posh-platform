@@ -228,7 +228,7 @@ function App() {
               <RoleRoute
                 allowedRoles={[1, 2, 5]}
                 requiredPermission="videos.upload"
-                accessItem="POSH Awareness Training"
+                accessItem="PoSH Training"
               >
                 <VideoListPage />
               </RoleRoute>
@@ -242,12 +242,20 @@ function App() {
               <RoleRoute
                 allowedRoles={[1]}
                 requiredPermission="videos.manage"
-                accessItem="POSH Awareness Training"
+                accessItem="PoSH Training"
               >
                 <VideoListPage />
               </RoleRoute>
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/admin/ic-training"
+          element={<Navigate to="/admin/videos" replace />}
+        />
+        <Route
+          path="/super-admin/ic-training"
+          element={<Navigate to="/super-admin/videos" replace />}
         />
         <Route
           path="/admin/certificates"
@@ -431,7 +439,7 @@ function App() {
               <RoleRoute
                 allowedRoles={[1]}
                 requiredPermission="training.assign"
-                accessItem="POSH Awareness Training"
+                accessItem="PoSH Training"
               >
                 <TrainingAssignPage />
               </RoleRoute>
@@ -525,7 +533,7 @@ function App() {
             <ProtectedRoute>
               <RoleRoute
                 allowedRoles={[4]}
-                accessItem="POSH Awareness Training"
+                accessItem="PoSH Training"
               >
                 <CoursesPage />
               </RoleRoute>
@@ -538,7 +546,20 @@ function App() {
             <ProtectedRoute>
               <RoleRoute
                 allowedRoles={[3]}
-                accessItem="POSH Awareness Training"
+                accessItem="IC Member Training"
+              >
+                <CoursesPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ic/posh-training"
+          element={
+            <ProtectedRoute>
+              <RoleRoute
+                allowedRoles={[3]}
+                accessItem="PoSH Training"
               >
                 <CoursesPage />
               </RoleRoute>
@@ -549,7 +570,7 @@ function App() {
           path="/employee/video/:videoId"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[4]}>
+              <RoleRoute allowedRoles={[4]} accessItem="PoSH Training">
                 <VideoPlayerPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -561,8 +582,18 @@ function App() {
             <ProtectedRoute>
               <RoleRoute
                 allowedRoles={[3]}
-                accessItem="POSH Awareness Training"
+                accessItem="IC Member Training"
               >
+                <VideoPlayerPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ic/posh-video/:videoId"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[3]} accessItem="PoSH Training">
                 <VideoPlayerPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -572,7 +603,7 @@ function App() {
           path="/employee/assessment/:videoId"
           element={
             <ProtectedRoute>
-              <RoleRoute allowedRoles={[4]}>
+              <RoleRoute allowedRoles={[4]} accessItem="PoSH Training">
                 <AssessmentPage />
               </RoleRoute>
             </ProtectedRoute>
@@ -584,8 +615,18 @@ function App() {
             <ProtectedRoute>
               <RoleRoute
                 allowedRoles={[3]}
-                accessItem="POSH Awareness Training"
+                accessItem="IC Member Training"
               >
+                <AssessmentPage />
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ic/posh-assessment/:videoId"
+          element={
+            <ProtectedRoute>
+              <RoleRoute allowedRoles={[3]} accessItem="PoSH Training">
                 <AssessmentPage />
               </RoleRoute>
             </ProtectedRoute>

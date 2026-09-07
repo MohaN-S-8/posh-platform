@@ -1,14 +1,26 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import apiClient from "../../api/client";
 import { useAuthStore } from "../../store/authStore";
 
 export function AssessmentPage() {
   const { videoId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthStore();
-  const coursePath = user?.role_id === 3 ? "/ic/training" : "/employee/courses";
-  const videoPath = user?.role_id === 3 ? `/ic/video/${videoId}` : `/employee/video/${videoId}`;
+  const isIcPoshTraining = user?.role_id === 3 && location.pathname.includes("/ic/posh");
+  const coursePath =
+    user?.role_id === 3
+      ? isIcPoshTraining
+        ? "/ic/posh-training"
+        : "/ic/training"
+      : "/employee/courses";
+  const videoPath =
+    user?.role_id === 3
+      ? isIcPoshTraining
+        ? `/ic/posh-video/${videoId}`
+        : `/ic/video/${videoId}`
+      : `/employee/video/${videoId}`;
   const certificatePath = user?.role_id === 3 ? "/ic/certificates" : "/employee/certificates";
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
@@ -90,7 +102,7 @@ export function AssessmentPage() {
         <div style={{ background: "white", borderRadius: "8px", padding: "28px" }}>
           <h3 style={{ color: availability?.attempted ? "#17324d" : "#c0392b", marginTop: 0 }}>
             {availability?.result === "Fail"
-              ? "Rewatch Required"
+              ? "Retake Available"
               : availability?.attempted
                 ? "Assessment Submitted"
                 : "Assessment Locked"}
@@ -139,7 +151,7 @@ export function AssessmentPage() {
               navigate(
                 result.result === "Pass"
                   ? certificatePath
-                  : videoPath,
+                  : coursePath,
               )
             }
             style={{
@@ -152,7 +164,7 @@ export function AssessmentPage() {
               cursor: "pointer",
             }}
           >
-            {result.result === "Pass" ? "View Certificates" : "Rewatch Video"}
+            {result.result === "Pass" ? "View Certificates" : "Back to Training"}
           </button>
         </div>
       ) : (
