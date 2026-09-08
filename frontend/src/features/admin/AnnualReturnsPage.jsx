@@ -73,6 +73,10 @@ function candidateKey(row) {
   return `${row?.company_id || ""}-${row?.branch_id || ""}-${row?.year || ""}`;
 }
 
+function branchOptionLabel(row) {
+  return row?.branch_name || "Head Office";
+}
+
 function parseJsonList(value) {
   if (Array.isArray(value)) return value;
   if (!value) return [];
@@ -102,49 +106,395 @@ function normalizeRowForForm(row) {
   };
 }
 
-function printableHtml(row, cover = false) {
-  if (cover) {
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function display(value, fallback = "-") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function lineBreaks(value) {
+  return escapeHtml(display(value)).replace(/\n/g, "<br />");
+}
+
+function printDate(value) {
+  const formatted = formatDate(value);
+  return formatted === "-" ? "-" : formatted;
+}
+
+function icMembersFor(row) {
+  return parseJsonList(row.ic_members_json || row.ic_members);
+}
+
+function complaintRowsFor(row) {
+  return parseJsonList(row.complaint_rows_json || row.complaint_rows);
+}
+
+function renderDataTable(rows, headers, emptyText = "NIL") {
+  if (!rows.length) {
     return `
-      <h2>Covering Letter - Annual Return ${row.year}</h2>
-      <p>From,<br />${row.covering_from_address || row.company_name || "-"}</p>
-      <p>To,<br />${row.posh_office_recipient || row.posh_office_address || "The District Officer"}</p>
-      <p>Please find enclosed the Annual Return under Section 21(1) / Rule 14 for
-      <strong>${row.company_name}</strong>, ${row.branch_name}, for the year ${row.year}.</p>
-      <p>Registered Post Tracking No: <strong>${row.registered_post_tracking_number || "-"}</strong></p>
-      <p style="margin-top: 48px;">Authorized Signatory</p>
+      <table class="letter-table">
+        <thead><tr>${headers.map((header) => `<th>${escapeHtml(header.label)}</th>`).join("")}</tr></thead>
+        <tbody><tr><td colspan="${headers.length}" class="center">${escapeHtml(emptyText)}</td></tr></tbody>
+      </table>
     `;
   }
   return `
-    <h2>Annual Return - ${row.branch_name} - ${row.year}</h2>
-    <p>Presiding Officer: ${row.presiding_officer || "-"} | Status: ${row.status} | Date: ${formatDate(row.return_date)}</p>
-    <h3>(a) Complaints Received</h3><p>${row.complaints_received ?? 0}</p>
-    <h3>(b) Complaints Disposed</h3><p>${row.complaints_disposed ?? 0}</p>
-    <h3>(c) Cases Pending Beyond 90 Days</h3><p>${row.complaints_pending_90 ?? 0}</p>
-    <h3>(d) Workshops / Awareness Programmes Conducted</h3><p>${row.workshops_count ?? 0} - ${row.workshop_details || "-"}</p>
-    <h3>(e) Nature of Action Taken</h3><p>${row.action_taken || "-"}</p>
-    <h3>POSH Office Recipient</h3><p>${row.posh_office_recipient || row.posh_office_address || "-"}</p>
+    <table class="letter-table">
+      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header.label)}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows
+          .map(
+            (item, index) => `
+              <tr>
+                ${headers
+                  .map((header) => {
+                    const value = header.key === "sr" ? index + 1 : item[header.key];
+                    return `<td>${escapeHtml(display(value))}</td>`;
+                  })
+                  .join("")}
+              </tr>
+            `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function printableHtml(row) {
+  const reportDate = printDate(row.return_date);
+  const yearEnd = `31 December ${row.year}`;
+  const icMembers = icMembersFor(row);
+  const complaintRows = complaintRowsFor(row);
+  const fromAddress = row.covering_from_address || [
+    row.company_name,
+    row.branch_name,
+  ].filter(Boolean).join("\n");
+  const toAddress =
+    row.posh_office_recipient ||
+    row.posh_office_address ||
+    "Office of the District Collector\nCollectorate\nChennai\nTamil Nadu - 600001";
+
+  return `
+    <div class="print-toolbar">
+      <button type="button" onclick="window.print()">Print</button>
+      <button type="button" onclick="window.close()">Close</button>
+    </div>
+    <p class="print-note">
+      Editable preview - correct any wording before printing. This Annual Return must go out on the employer's letterhead, signed by the Presiding Officer, under Section 21(1) of the POSH Act, 2013.
+    </p>
+    <main class="letter-page">
+      <header class="letter-head">
+        <h1>${escapeHtml(display(row.company_name, "Company Name"))}</h1>
+        <div>${lineBreaks(fromAddress)}</div>
+      </header>
+      <div class="rule"></div>
+      <div class="date-line">Date: ${escapeHtml(reportDate)}</div>
+      <section class="address-block">
+        <strong>To</strong><br />
+        ${lineBreaks(toAddress)}
+      </section>
+      <section class="letter-title">
+        <h2>ANNUAL RETURN OF THE INTERNAL COMMITTEE</h2>
+        <p>
+          Submitted under Section 21(1) of the Sexual Harassment of Women at Workplace
+          (Prevention, Prohibition and Redressal) Act, 2013, read with Rule 14 of
+          the Rules made thereunder, for the calendar year ${escapeHtml(row.year)}.
+        </p>
+      </section>
+
+      <table class="letter-table meta-table">
+        <tbody>
+          <tr><th>Branch</th><td>${escapeHtml(display(row.branch_name))}</td></tr>
+          <tr><th>Year</th><td>${escapeHtml(display(row.year))}</td></tr>
+          <tr><th>Date of Report</th><td>${escapeHtml(reportDate)}</td></tr>
+          <tr><th>Presiding Officer</th><td>${escapeHtml(display(row.presiding_officer))}</td></tr>
+          <tr><th>Sector / Nature of Business</th><td>${escapeHtml(display(row.sector_nature))}</td></tr>
+          <tr><th>Shift Breakdown</th><td>${lineBreaks(row.shift_breakdown)}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Statement of Particulars</h3>
+      <table class="letter-table">
+        <thead>
+          <tr><th>Sr.</th><th>Particular</th><th>Details</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>(a)</td>
+            <td>Number of complaints of sexual harassment received during the year</td>
+            <td>${escapeHtml(row.complaints_received ?? 0)}</td>
+          </tr>
+          <tr>
+            <td>(b)</td>
+            <td>Number of complaints disposed of during the year</td>
+            <td>${escapeHtml(row.complaints_disposed ?? 0)}</td>
+          </tr>
+          <tr>
+            <td>(c)</td>
+            <td>Number of cases pending for more than ninety days as on ${escapeHtml(yearEnd)}</td>
+            <td>${escapeHtml(row.complaints_pending_90 ?? 0)}</td>
+          </tr>
+          <tr>
+            <td>-</td>
+            <td>Nature of action taken by the employer</td>
+            <td>${lineBreaks(row.action_taken)}</td>
+          </tr>
+          <tr>
+            <td>(d)</td>
+            <td>
+              Number of workshops / awareness programmes conducted
+              (${escapeHtml(printDate(row.workshop_period_from))} to ${escapeHtml(printDate(row.workshop_period_to))})
+            </td>
+            <td>${escapeHtml(row.workshops_count ?? 0)}<br />${lineBreaks(row.workshop_details)}</td>
+          </tr>
+          <tr>
+            <td>-</td>
+            <td>Number of employees who attended such sessions</td>
+            <td>${escapeHtml(row.awareness_attendees ?? 0)}</td>
+          </tr>
+          <tr>
+            <td>-</td>
+            <td>Number of employees working</td>
+            <td>
+              Women - ${escapeHtml(row.employees_female ?? 0)}<br />
+              Men - ${escapeHtml(row.employees_male ?? 0)}<br />
+              Total - ${escapeHtml(row.employees_total ?? 0)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Initiatives Taken During the Year</h3>
+      <ol class="initiative-list">
+        <li>The Internal Committee was constituted on ${escapeHtml(printDate(row.ic_constituted_date))}.</li>
+        <li>Change in Internal Committee members during the year: ${escapeHtml(display(row.ic_member_change, "NIL"))}.</li>
+        <li>An orientation programme for IC members was conducted on ${escapeHtml(printDate(row.orientation_programme_date))}.</li>
+        <li>The Anti-Sexual Harassment Policy is disseminated to all employees: ${escapeHtml(display(row.policy_disseminated))}.</li>
+        <li>Notice of constitution of the Internal Committee has been displayed at the workplace from ${escapeHtml(printDate(row.notice_displayed_from))}.</li>
+        <li>A Work-From-Home awareness session was conducted on ${escapeHtml(printDate(row.wfh_awareness_session_date))}.</li>
+        <li>New joiners are given orientation on the POSH policy: ${escapeHtml(display(row.new_joiner_orientation_timing))}.</li>
+        <li>POSH Awareness Programme - Date: ${escapeHtml(printDate(row.posh_awareness_date))}; Mode of Training: ${escapeHtml(display(row.posh_awareness_mode))}; Resource Person: ${escapeHtml(display(row.posh_awareness_resource_person))}.</li>
+      </ol>
+
+      <h3>Internal Committee Members (as on ${escapeHtml(yearEnd)})</h3>
+      ${renderDataTable(
+        icMembers,
+        [
+          { key: "sr", label: "Sr." },
+          { key: "name", label: "Name" },
+          { key: "designation", label: "Designation" },
+          { key: "contact_no", label: "Contact No." },
+          { key: "email", label: "Email" },
+        ],
+      )}
+
+      <h3>Summary of Action Taken on Complaints</h3>
+      ${renderDataTable(
+        complaintRows,
+        [
+          { key: "sr", label: "Sr." },
+          { key: "case_no", label: "Complaint No." },
+          { key: "complainant_f", label: "Complainant (F)" },
+          { key: "complainant_m", label: "Complainant (M)" },
+          { key: "respondent", label: "Respondent" },
+          { key: "action", label: "Disciplinary Action" },
+        ],
+      )}
+
+      <p class="declaration">
+        This is to certify that the above particulars are true to the best of our
+        knowledge and are submitted in compliance with Section 21(1) of the Sexual
+        Harassment of Women at Workplace (Prevention, Prohibition and Redressal)
+        Act, 2013.
+      </p>
+
+      <section class="signature-block">
+        <div></div>
+        <div>
+          <div class="signature-line"></div>
+          <p>Signature of Presiding Officer</p>
+          <p>Name: ${escapeHtml(display(row.presiding_officer))}</p>
+          <p>Presiding Officer, Internal Committee</p>
+          <p>Date: ${escapeHtml(reportDate)}</p>
+        </div>
+      </section>
+      <p class="seal">Company Seal:</p>
+    </main>
   `;
 }
 
 function printRow(row, cover = false) {
-  const printWindow = window.open("", "_blank", "noopener,noreferrer");
+  const printWindow = window.open("", "_blank", "width=900,height=1100");
   if (!printWindow) return;
   printWindow.document.write(`
     <html>
       <head>
         <title>${cover ? "Covering Letter" : "Annual Return"} ${row.year}</title>
         <style>
-          body { font-family: Arial, sans-serif; color: #1b1642; padding: 32px; line-height: 1.55; }
-          h2 { color: #43248a; }
-          h3 { color: #43248a; font-size: 14px; margin-bottom: 4px; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            background: #f3f4f6;
+            color: #111827;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 12px;
+            line-height: 1.45;
+          }
+          .print-toolbar {
+            position: sticky;
+            top: 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 2;
+          }
+          .print-toolbar button {
+            background: #4a2e83;
+            color: white;
+            border: 0;
+            border-radius: 6px;
+            padding: 9px 18px;
+            font-weight: 700;
+            cursor: pointer;
+          }
+          .print-note {
+            max-width: 760px;
+            margin: 10px auto 18px;
+            text-align: center;
+            color: #475569;
+            font-size: 11px;
+          }
+          .letter-page {
+            width: 760px;
+            min-height: 1080px;
+            margin: 0 auto 32px;
+            background: white;
+            padding: 28px 44px 48px;
+          }
+          .letter-head {
+            text-align: center;
+          }
+          .letter-head h1 {
+            margin: 0 0 8px;
+            font-size: 24px;
+            letter-spacing: 0;
+            text-transform: uppercase;
+          }
+          .rule {
+            border-top: 2px solid #111827;
+            margin: 20px 0;
+          }
+          .date-line {
+            text-align: right;
+            font-weight: 700;
+            margin-bottom: 18px;
+          }
+          .address-block {
+            margin-bottom: 18px;
+            font-weight: 700;
+          }
+          .letter-title {
+            text-align: center;
+            margin: 12px 0 20px;
+          }
+          .letter-title h2 {
+            margin: 0 0 6px;
+            font-size: 18px;
+            letter-spacing: 0;
+            text-transform: uppercase;
+          }
+          .letter-title p {
+            margin: 0 auto;
+            max-width: 650px;
+            font-style: italic;
+          }
+          h3 {
+            margin: 24px 0 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #111827;
+            font-size: 13px;
+          }
+          .letter-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+          }
+          .letter-table th,
+          .letter-table td {
+            border: 1px solid #9ca3af;
+            padding: 7px 9px;
+            vertical-align: top;
+            text-align: left;
+          }
+          .letter-table th {
+            background: #f8fafc;
+            font-weight: 700;
+          }
+          .meta-table th {
+            width: 35%;
+          }
+          .center {
+            text-align: center !important;
+          }
+          .initiative-list {
+            margin: 0 0 18px;
+            padding-left: 18px;
+          }
+          .initiative-list li {
+            margin-bottom: 8px;
+          }
+          .declaration {
+            margin-top: 24px;
+            font-weight: 700;
+          }
+          .signature-block {
+            display: grid;
+            grid-template-columns: 1fr 260px;
+            gap: 24px;
+            margin-top: 78px;
+            text-align: center;
+          }
+          .signature-line {
+            border-top: 1px solid #111827;
+            margin-bottom: 8px;
+          }
+          .signature-block p {
+            margin: 3px 0;
+          }
+          .seal {
+            margin-top: 60px;
+          }
+          @media print {
+            body { background: white; }
+            .print-toolbar,
+            .print-note { display: none; }
+            .letter-page {
+              width: auto;
+              min-height: auto;
+              margin: 0;
+              padding: 0;
+            }
+            @page { size: A4; margin: 18mm; }
+          }
         </style>
       </head>
-      <body>${printableHtml(row, cover)}</body>
+      <body>${printableHtml(row)}</body>
     </html>
   `);
   printWindow.document.close();
   printWindow.focus();
-  printWindow.print();
 }
 
 export function AnnualReturnsPage() {
@@ -241,28 +591,8 @@ export function AnnualReturnsPage() {
 
   const updateFormRow = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
-  const changeCompany = (companyId) => {
-    const nextRow = (data.rows || []).find((row) => String(row.company_id) === String(companyId));
-    if (nextRow) {
-      setForm(normalizeRowForForm(nextRow));
-      return;
-    }
-    const nextCompany = companies.find((company) => String(company.company_id) === String(companyId));
-    setForm((current) => ({
-      ...current,
-      company_id: companyId,
-      company_name: nextCompany?.company_name || "",
-      branch_id: "HEAD-OFFICE",
-      branch_name: nextCompany?.company_name
-        ? `${nextCompany.company_name} Head Office`
-        : "Head Office",
-    }));
-  };
-
-  const changeBranch = (branchId) => {
-    const nextRow = (data.rows || []).find(
-      (row) => String(row.company_id) === String(form.company_id) && row.branch_id === branchId,
-    );
+  const changeBranch = (branchKey) => {
+    const nextRow = (data.rows || []).find((row) => candidateKey(row) === branchKey);
     if (nextRow) setForm((current) => ({ ...normalizeRowForForm(nextRow), year: current.year }));
   };
 
@@ -380,20 +710,21 @@ export function AnnualReturnsPage() {
       {showForm && (
         <AnnualReturnForm
           form={form}
-          companies={companies}
           branches={
-            (data.rows || []).filter((row) => String(row.company_id) === String(form.company_id))
-              .length
-              ? (data.rows || []).filter((row) => String(row.company_id) === String(form.company_id))
-              : [{ branch_id: form.branch_id || "HEAD-OFFICE", branch_name: form.branch_name || "Head Office" }]
+            data.rows?.length
+              ? data.rows
+              : [{
+                ...form,
+                company_id: form.company_id || user?.company_id || "",
+                branch_id: form.branch_id || "HEAD-OFFICE",
+                branch_name: form.branch_name || "Head Office",
+              }]
           }
           offices={offices}
-          canSeePlatform={canSeePlatform}
           saving={saving}
           onSubmit={saveAnnualReturn}
           onClose={() => setShowForm(false)}
           onChange={updateFormRow}
-          onCompanyChange={changeCompany}
           onBranchChange={changeBranch}
           onSelectOffice={selectOffice}
           onFileChange={updateFileName}
@@ -446,15 +777,12 @@ export function AnnualReturnsPage() {
 
 function AnnualReturnForm({
   form,
-  companies,
   branches,
   offices,
-  canSeePlatform,
   saving,
   onSubmit,
   onClose,
   onChange,
-  onCompanyChange,
   onBranchChange,
   onSelectOffice,
   onFileChange,
@@ -473,23 +801,11 @@ function AnnualReturnForm({
       </div>
 
       <div style={gridStyle}>
-        {canSeePlatform ? (
-          <label style={labelStyle}>
-            Company Name
-            <select value={form.company_id} onChange={(event) => onCompanyChange(event.target.value)} style={inputStyle} required>
-              {companies.map((company) => (
-                <option key={company.company_id} value={company.company_id}>{company.company_name}</option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <TextInput label="Company Name" value={form.company_name} readOnly />
-        )}
         <label style={labelStyle}>
           Branch Name
-          <select value={form.branch_id} onChange={(event) => onBranchChange(event.target.value)} style={inputStyle} required>
+          <select value={candidateKey(form)} onChange={(event) => onBranchChange(event.target.value)} style={inputStyle} required>
             {branches.map((branch) => (
-              <option key={branch.branch_id} value={branch.branch_id}>{branch.branch_name}</option>
+              <option key={candidateKey(branch)} value={candidateKey(branch)}>{branchOptionLabel(branch)}</option>
             ))}
           </select>
         </label>
@@ -559,9 +875,10 @@ function AnnualReturnForm({
         fields={[
           ["name", "Name"],
           ["designation", "Designation"],
+          ["contact_no", "Contact No."],
           ["email", "Email"],
         ]}
-        onAdd={() => onAddListItem("ic_members", { name: "", designation: "", email: "" })}
+        onAdd={() => onAddListItem("ic_members", { name: "", designation: "", contact_no: "", email: "" })}
         onDelete={(index) => onDeleteListItem("ic_members", index)}
         onUpdate={(index, key, value) => onUpdateListItem("ic_members", index, key, value)}
       />
@@ -572,10 +889,12 @@ function AnnualReturnForm({
         rows={form.complaint_rows}
         fields={[
           ["case_no", "Case No"],
-          ["summary", "Summary"],
+          ["complainant_f", "Complainant (F)"],
+          ["complainant_m", "Complainant (M)"],
+          ["respondent", "Respondent"],
           ["action", "Action Taken"],
         ]}
-        onAdd={() => onAddListItem("complaint_rows", { case_no: "", summary: "", action: "" })}
+        onAdd={() => onAddListItem("complaint_rows", { case_no: "", complainant_f: "", complainant_m: "", respondent: "", action: "" })}
         onDelete={(index) => onDeleteListItem("complaint_rows", index)}
         onUpdate={(index, key, value) => onUpdateListItem("complaint_rows", index, key, value)}
       />
@@ -778,15 +1097,12 @@ function Detail({ label, value }) {
 
 AnnualReturnForm.propTypes = {
   form: PropTypes.object.isRequired,
-  companies: PropTypes.array.isRequired,
   branches: PropTypes.array.isRequired,
   offices: PropTypes.array.isRequired,
-  canSeePlatform: PropTypes.bool.isRequired,
   saving: PropTypes.bool.isRequired,
   onSubmit: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
   onChange: PropTypes.func.isRequired,
-  onCompanyChange: PropTypes.func.isRequired,
   onBranchChange: PropTypes.func.isRequired,
   onSelectOffice: PropTypes.func.isRequired,
   onFileChange: PropTypes.func.isRequired,
