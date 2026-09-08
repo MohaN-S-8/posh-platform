@@ -26,11 +26,15 @@ const initialForm = {
 export function CertificateTemplatePage() {
   const { user } = useAuthStore();
   const [templates, setTemplates] = useState([]);
+  const [manualCandidates, setManualCandidates] = useState([]);
+  const [issueModes, setIssueModes] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [assetUploading, setAssetUploading] = useState("");
+  const [issuingKey, setIssuingKey] = useState("");
+  const [updatingModeCompanyId, setUpdatingModeCompanyId] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const canApproveTemplates = user?.role_id === 1;
@@ -48,12 +52,32 @@ export function CertificateTemplatePage() {
     }
   }, []);
 
+  const loadManualCandidates = useCallback(async () => {
+    try {
+      const res = await apiClient.get("/certificates/manual-candidates");
+      setManualCandidates(res.data || []);
+    } catch {
+      setManualCandidates([]);
+    }
+  }, []);
+
+  const loadIssueModes = useCallback(async () => {
+    try {
+      const res = await apiClient.get("/certificates/issue-modes");
+      setIssueModes(res.data || []);
+    } catch {
+      setIssueModes([]);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       loadTemplates();
+      loadManualCandidates();
+      loadIssueModes();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadTemplates]);
+  }, [loadTemplates, loadManualCandidates, loadIssueModes]);
 
   const submitTemplate = async (e) => {
     e.preventDefault();
@@ -70,6 +94,8 @@ export function CertificateTemplatePage() {
       setForm(initialForm);
       setShowForm(false);
       await loadTemplates();
+      await loadManualCandidates();
+      await loadIssueModes();
     } catch (err) {
       setError(apiErrorMessage(err, "Unable to save certificate template."));
     } finally {
@@ -87,6 +113,8 @@ export function CertificateTemplatePage() {
       );
       setSuccess(`Template ${nextStatus.toLowerCase()} successfully.`);
       await loadTemplates();
+      await loadManualCandidates();
+      await loadIssueModes();
     } catch (err) {
       setError(apiErrorMessage(err, "Unable to update template status."));
     } finally {
@@ -117,6 +145,8 @@ export function CertificateTemplatePage() {
         setSuccess(`${label} uploaded and sent for Super Admin approval.`);
       }
       await loadTemplates();
+      await loadManualCandidates();
+      await loadIssueModes();
     } catch (err) {
       setError(apiErrorMessage(err, "Unable to upload template asset."));
     } finally {
@@ -136,10 +166,52 @@ export function CertificateTemplatePage() {
       const res = await apiClient.delete(`/certificates/templates/${template.template_id}`);
       setSuccess(res.data?.message || "Certificate template deleted.");
       await loadTemplates();
+      await loadManualCandidates();
+      await loadIssueModes();
     } catch (err) {
       setError(apiErrorMessage(err, "Unable to delete certificate template."));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const issueCertificate = async (candidate) => {
+    const key = `${candidate.user_id}-${candidate.video_id}`;
+    setIssuingKey(key);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiClient.post(
+        `/certificates/generate?user_id=${candidate.user_id}&video_id=${candidate.video_id}`,
+      );
+      setSuccess(
+        res.data?.message ||
+          `Certificate issued for ${candidate.employee_name}.`,
+      );
+      await loadManualCandidates();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Unable to issue certificate."));
+    } finally {
+      setIssuingKey("");
+    }
+  };
+
+  const updateIssueMode = async (company, checked) => {
+    const nextMode = checked ? "Automatic" : "Manual";
+    setUpdatingModeCompanyId(company.company_id);
+    setError("");
+    setSuccess("");
+    try {
+      await apiClient.patch(
+        `/certificates/issue-modes/${company.company_id}?mode=${nextMode}`,
+      );
+      setSuccess(`${company.company_name} certificate issue mode set to ${nextMode}.`);
+      await loadIssueModes();
+      await loadManualCandidates();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Unable to update certificate issue mode."));
+    } finally {
+      setUpdatingModeCompanyId(null);
     }
   };
 
@@ -219,6 +291,39 @@ export function CertificateTemplatePage() {
 
       <div className="portal-card" style={{ marginBottom: "20px" }}>
         <div className="portal-section-title" style={{ marginTop: 0 }}>
+          Certificate Issue Mode
+        </div>
+        <p style={{ color: "var(--portal-muted)", margin: "0 0 14px", fontSize: "13px" }}>
+          Automatic issues the certificate after an assessment pass. Manual keeps passed users in the pending issue list until an admin issues it.
+        </p>
+        <div style={modeGridStyle}>
+          {issueModes.length ? (
+            issueModes.map((company) => {
+              const isAutomatic = (company.certificate_issue_mode || "Automatic") === "Automatic";
+              return (
+                <label key={company.company_id} style={modeCardStyle}>
+                  <input
+                    type="checkbox"
+                    checked={isAutomatic}
+                    disabled={updatingModeCompanyId === company.company_id}
+                    onChange={(event) => updateIssueMode(company, event.target.checked)}
+                    style={{ width: "18px", height: "18px" }}
+                  />
+                  <span>
+                    <strong>{company.company_name}</strong>
+                    <small>{company.company_code || "-"} - {isAutomatic ? "Automatic" : "Manual"}</small>
+                  </span>
+                </label>
+              );
+            })
+          ) : (
+            <p style={{ color: "#64748b", margin: 0 }}>No companies available for certificate issue setup.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="portal-card" style={{ marginBottom: "20px" }}>
+        <div className="portal-section-title" style={{ marginTop: 0 }}>
           Ready-Made Template Placeholders
         </div>
         <p style={{ color: "var(--portal-muted)", margin: 0, fontSize: "13px" }}>
@@ -226,6 +331,67 @@ export function CertificateTemplatePage() {
           <strong>&lt;&lt;name&gt;&gt;</strong>, <strong>&lt;&lt;course&gt;&gt;</strong>,{" "}
           <strong>&lt;&lt;date&gt;&gt;</strong>, and <strong>&lt;&lt;certificate_no&gt;&gt;</strong>.
         </p>
+      </div>
+
+      <div className="portal-card" style={{ marginBottom: "20px" }}>
+        <div className="portal-section-title" style={{ marginTop: 0 }}>
+          Manual Certificate Issue
+        </div>
+        <p style={{ color: "var(--portal-muted)", margin: "0 0 14px", fontSize: "13px" }}>
+          Issue certificates company-wise for users who passed assessment but do not have a valid certificate yet.
+        </p>
+        <table className="portal-table" style={{ minWidth: "920px" }}>
+          <thead>
+            <tr>
+              {["Company", "Employee", "Email", "Training", "Score", "Attempted", "Action"].map(
+                (heading) => (
+                  <th key={heading} style={thStyle}>
+                    {heading}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {manualCandidates.length ? (
+              manualCandidates.map((candidate) => {
+                const key = `${candidate.user_id}-${candidate.video_id}`;
+                return (
+                  <tr key={key}>
+                    <td style={tdStyle}>{candidate.company_name || "-"}</td>
+                    <td style={{ ...tdStyle, color: "var(--portal-purple)", fontWeight: 700 }}>
+                      {candidate.employee_name || "-"}
+                    </td>
+                    <td style={tdStyle}>{candidate.email || "-"}</td>
+                    <td style={tdStyle}>{candidate.course_name || "-"}</td>
+                    <td style={tdStyle}>{Number(candidate.score || 0).toFixed(1)}%</td>
+                    <td style={tdStyle}>
+                      {candidate.attempted_at
+                        ? new Date(candidate.attempted_at).toLocaleString()
+                        : "-"}
+                    </td>
+                    <td style={tdStyle}>
+                      <button
+                        type="button"
+                        onClick={() => issueCertificate(candidate)}
+                        disabled={issuingKey === key}
+                        style={primaryButtonStyle}
+                      >
+                        {issuingKey === key ? "Issuing..." : "Issue"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={7} style={{ padding: "28px", color: "#64748b" }}>
+                  No pending manual certificates.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div style={tableWrapStyle}>
@@ -377,9 +543,15 @@ export function CertificateTemplatePage() {
       </div>
 
       <LoadingOverlay
-        show={loading || saving || Boolean(assetUploading)}
-        title={saving ? "Saving template" : "Loading templates"}
-        message="Fetching certificate template configuration."
+        show={
+          loading ||
+          saving ||
+          Boolean(assetUploading) ||
+          Boolean(issuingKey) ||
+          Boolean(updatingModeCompanyId)
+        }
+        title={issuingKey ? "Issuing certificate" : saving ? "Saving template" : "Loading templates"}
+        message={issuingKey ? "Issuing certificate PDF." : "Fetching certificate template configuration."}
       />
     </PortalShell>
   );
@@ -434,6 +606,24 @@ const fileButtonStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: "6px",
+};
+
+const modeGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "12px",
+};
+
+const modeCardStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  padding: "12px",
+  border: "1px solid var(--portal-border)",
+  borderRadius: "8px",
+  background: "#fff",
+  color: "var(--portal-purple)",
+  cursor: "pointer",
 };
 
 const tableWrapStyle = {

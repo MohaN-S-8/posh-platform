@@ -132,6 +132,12 @@ function buildReportSummary(analytics) {
   ];
 }
 
+function downloadNameFromResponse(res, fallback) {
+  const disposition = res.headers?.["content-disposition"] || "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || fallback;
+}
+
 export function AdminReportsPage() {
   const { user } = useAuthStore();
   const [selectedService, setSelectedService] = useState("posh");
@@ -169,7 +175,7 @@ export function AdminReportsPage() {
       const url = URL.createObjectURL(res.data);
       const link = document.createElement("a");
       link.href = url;
-      link.download = report.fileName;
+      link.download = downloadNameFromResponse(res, report.fileName);
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {

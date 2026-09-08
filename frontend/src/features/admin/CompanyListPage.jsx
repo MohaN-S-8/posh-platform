@@ -53,6 +53,9 @@ const emptyForm = {
   posh_policy: "",
   posh_policy_version: "",
   posh_policy_effective_date: "",
+  posh_policy_document_path: "",
+  posh_policy_document_name: "",
+  certificate_issue_mode: "Automatic",
   employee_strength: "",
   address: "",
   corp_address_json: "",
@@ -278,6 +281,7 @@ export function CompanyListPage() {
   const [masters, setMasters] = useState([]);
   const [assignableUsers, setAssignableUsers] = useState([]);
   const [approvingCompanyId, setApprovingCompanyId] = useState(null);
+  const [policyDocumentFile, setPolicyDocumentFile] = useState(null);
 
   const fetchMasters = useCallback(async () => {
     try {
@@ -381,6 +385,7 @@ export function CompanyListPage() {
         scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
         client_id: "",
         employee_strength: match.employee_strength || "",
+        certificate_issue_mode: match.certificate_issue_mode || "Automatic",
       });
       return;
     }
@@ -400,7 +405,9 @@ export function CompanyListPage() {
       reference_no: nextReferenceNo(companies),
       service_details_json: JSON.stringify(fixedPoshServiceRows(emptyForm)),
       scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
+      certificate_issue_mode: "Automatic",
     });
+    setPolicyDocumentFile(null);
     setShowForm(true);
     setError("");
     setSuccess("");
@@ -415,7 +422,9 @@ export function CompanyListPage() {
       employee_strength: company.employee_strength || "",
       service_details_json: JSON.stringify(fixedPoshServiceRows(company)),
       scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
+      certificate_issue_mode: company.certificate_issue_mode || "Automatic",
     });
+    setPolicyDocumentFile(null);
     setShowForm(true);
     setError("");
     setSuccess("");
@@ -427,6 +436,22 @@ export function CompanyListPage() {
       setError("Industry is required before submitting for approval.");
       return;
     }
+    if (!form.posh_policy?.trim()) {
+      setError("PoSH Policy is required before submitting for approval.");
+      return;
+    }
+    if (!form.posh_policy_version?.trim()) {
+      setError("PoSH Policy version is required before submitting for approval.");
+      return;
+    }
+    if (!form.posh_policy_effective_date?.trim()) {
+      setError("PoSH Policy approved/effective date is required before submitting for approval.");
+      return;
+    }
+    if (!form.posh_policy_document_path && !policyDocumentFile) {
+      setError("PoSH Policy PDF document is required before submitting for approval.");
+      return;
+    }
     const generatedCompanyCode = generateCompanyCode(form.company_name);
     if (generatedCompanyCode.length !== 4) {
       setError("Company name must contain at least 4 letters to generate the company code.");
@@ -436,24 +461,36 @@ export function CompanyListPage() {
     setError("");
     setSuccess("");
     try {
+      let savedCompany = null;
       if (editingCompany) {
         const payload = normalizePayload();
         delete payload.company_code;
-        await apiClient.put(`/companies/${editingCompany.company_id}`, payload);
+        const res = await apiClient.put(`/companies/${editingCompany.company_id}`, payload);
+        savedCompany = res.data;
         setSuccess("Company details updated.");
       } else if (selectedExistingCompany) {
         const payload = normalizePayload();
         delete payload.company_code;
-        await apiClient.put(`/companies/${selectedExistingCompany.company_id}`, payload);
+        const res = await apiClient.put(`/companies/${selectedExistingCompany.company_id}`, payload);
+        savedCompany = res.data;
         setSuccess("Company work order submitted for approval.");
       } else {
-        await apiClient.post("/companies/", normalizePayload());
+        const res = await apiClient.post("/companies/", normalizePayload());
+        savedCompany = res.data;
         setSuccess("Company work order submitted for approval.");
+      }
+      if (policyDocumentFile && savedCompany?.company_id) {
+        const filePayload = new FormData();
+        filePayload.append("file", policyDocumentFile);
+        await apiClient.post(`/companies/${savedCompany.company_id}/policy-document`, filePayload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
       setShowForm(false);
       setEditingCompany(null);
       setSelectedExistingCompany(null);
       setForm(emptyForm);
+      setPolicyDocumentFile(null);
       await fetchCompanies();
     } catch (err) {
       setError(apiErrorMessage(err, "Failed to save company."));
@@ -797,8 +834,9 @@ export function CompanyListPage() {
                     />
                   </label>
                   <label style={labelStyle}>
-                    POSH Policy
+                    POSH Policy *
                     <input
+                      required
                       value={form.posh_policy || ""}
                       onChange={(event) =>
                         setForm({ ...form, posh_policy: event.target.value })
@@ -807,8 +845,9 @@ export function CompanyListPage() {
                     />
                   </label>
                   <label style={labelStyle}>
-                    Version
+                    Version *
                     <input
+                      required
                       value={form.posh_policy_version || ""}
                       onChange={(event) =>
                         setForm({ ...form, posh_policy_version: event.target.value })
@@ -817,8 +856,9 @@ export function CompanyListPage() {
                     />
                   </label>
                   <label style={labelStyle}>
-                    Approved / Effective Date
+                    Approved / Effective Date *
                     <input
+                      required
                       type="date"
                       value={form.posh_policy_effective_date || ""}
                       onChange={(event) =>
@@ -826,6 +866,48 @@ export function CompanyListPage() {
                       }
                       style={inputStyle}
                     />
+                  </label>
+                  <label style={labelStyle}>
+                    Policy PDF *
+                    <input
+                      required={!form.posh_policy_document_path}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={(event) => setPolicyDocumentFile(event.target.files?.[0] || null)}
+                      style={inputStyle}
+                    />
+                    {(policyDocumentFile || form.posh_policy_document_name) && (
+                      <span style={helperTextStyle}>
+                        {policyDocumentFile?.name || form.posh_policy_document_name}
+                      </span>
+                    )}
+                  </label>
+                  <label
+                    style={{
+                      ...labelStyle,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "10px 12px",
+                      border: "1px solid var(--portal-border)",
+                      borderRadius: "8px",
+                      background: "#fff",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={(form.certificate_issue_mode || "Automatic") === "Automatic"}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          certificate_issue_mode: event.target.checked ? "Automatic" : "Manual",
+                        })
+                      }
+                      style={{ width: "18px", height: "18px" }}
+                    />
+                    <span>
+                      Issue certificates automatically after assessment pass
+                    </span>
                   </label>
                   <label style={labelStyle}>
                     Employee Strength
@@ -913,7 +995,17 @@ export function CompanyListPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "960px" }}>
             <thead>
               <tr style={{ background: "#faf8ff", color: "var(--portal-muted)" }}>
-                {["Ref No", "Company", "Code", "Status", "Client ID(s)", "Approval", "Actions"].map(
+                {[
+                  "Ref No",
+                  "Company",
+                  "Code",
+                  "Status",
+                  "Client ID(s)",
+                  "Policy",
+                  "Certificate",
+                  "Approval",
+                  "Actions",
+                ].map(
                   (heading) => (
                     <th key={heading} style={thStyle}>
                       {heading}
@@ -925,7 +1017,7 @@ export function CompanyListPage() {
             <tbody>
               {companies.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#999" }}>
+                  <td colSpan={9} style={{ padding: "40px", textAlign: "center", color: "#999" }}>
                     No companies found. Create one above.
                   </td>
                 </tr>
@@ -943,6 +1035,14 @@ export function CompanyListPage() {
                     <td style={tdStyle}>{company.company_code}</td>
                     <td style={tdStyle}>{company.company_status_type || "Client"}</td>
                     <td style={tdStyle}>{company.client_id || "-"}</td>
+                    <td style={tdStyle}>
+                      <strong>{company.posh_policy_version ? `v${company.posh_policy_version}` : "-"}</strong>
+                      <br />
+                      <span>{company.posh_policy_effective_date || "No effective date"}</span>
+                      <br />
+                      <span>{company.posh_policy_document_name || "No PDF uploaded"}</span>
+                    </td>
+                    <td style={tdStyle}>{company.certificate_issue_mode || "Automatic"}</td>
                     <td style={tdStyle}>
                       <span style={approvalStyle(company.approval_status)}>{company.approval_status || "Pending"}</span>
                     </td>

@@ -1,5 +1,7 @@
 import AddIcon from "@mui/icons-material/Add";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import KeyIcon from "@mui/icons-material/Key";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import apiClient from "../../api/client";
@@ -10,7 +12,7 @@ import { useAuthStore } from "../../store/authStore";
 
 const ROLES = {
   1: "Super Admin",
-  2: "Corp Admin",
+  2: "Admin",
   5: "Admin",
   3: "IC",
   4: "Employee",
@@ -34,7 +36,7 @@ function defaultIcRoleFor(roleId) {
 
 function emptyMessageFor(user) {
   if (user?.role_id === 2) {
-    return "No Client / Management, IC, or Employee users found. Company Admin can create and manage these users here.";
+    return "No Client / Management, IC, or Employee users found. Admin can create and manage these users here.";
   }
   if (user?.role_id === 5) {
     return "No Employee or IC users found. Admin can create and manage its own Employee and IC users here.";
@@ -148,8 +150,10 @@ export function UserListPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [bulkErrors, setBulkErrors] = useState([]);
   const [search, setSearch] = useState("");
   const isHrRoute = location.pathname.startsWith("/hr/");
   const pageTitle =
@@ -345,6 +349,69 @@ export function UserListPage() {
     }
   };
 
+  const upgradeToIc = async (target) => {
+    const name = `${target.first_name || ""} ${target.last_name || ""}`.trim();
+    const confirmed = window.confirm(
+      `Upgrade ${name || target.email} from Employee to IC?`,
+    );
+    if (!confirmed) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await apiClient.post(`/users/${target.user_id}/upgrade-to-ic`, {
+        ic_role: target.ic_role || "Internal Committee Member",
+      });
+      setSuccess("Employee upgraded to IC successfully.");
+      await loadData();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Failed to upgrade employee to IC."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const downloadBulkTemplate = async () => {
+    setError("");
+    try {
+      const res = await apiClient.get("/users/bulk-template", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "user_bulk_template.csv";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(apiErrorMessage(err, "Unable to download user bulk template."));
+    }
+  };
+
+  const uploadBulkUsers = async (file) => {
+    if (!file) return;
+    setBulkUploading(true);
+    setError("");
+    setSuccess("");
+    setBulkErrors([]);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await apiClient.post("/users/bulk-upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setBulkErrors(res.data?.errors || []);
+      setSuccess(
+        `Bulk upload finished. Created ${res.data?.created_count || 0} user(s), ${
+          res.data?.error_count || 0
+        } error(s).`,
+      );
+      await loadData();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Unable to upload users."));
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
   return (
     <PortalShell
       title={pageTitle}
@@ -367,6 +434,24 @@ export function UserListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ ...inputStyle, width: "220px" }}
           />
+          <button type="button" onClick={downloadBulkTemplate} style={secondaryButtonStyle}>
+            <FileDownloadIcon fontSize="small" />
+            Template
+          </button>
+          <label style={{ ...secondaryButtonStyle, cursor: "pointer" }}>
+            <UploadFileIcon fontSize="small" />
+            {bulkUploading ? "Uploading..." : "Bulk Upload"}
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              disabled={bulkUploading}
+              onChange={(event) => {
+                uploadBulkUsers(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+              style={{ display: "none" }}
+            />
+          </label>
           <button
             type="button"
             onClick={() => {
@@ -395,6 +480,13 @@ export function UserListPage() {
 
       {error && <div style={errorStyle}>{error}</div>}
       {success && <div style={successStyle}>{success}</div>}
+      {bulkErrors.length > 0 && (
+        <div style={errorStyle}>
+          <strong>Rows needing correction:</strong>{" "}
+          {bulkErrors.slice(0, 5).map((item) => `Row ${item.row}: ${item.error}`).join(" | ")}
+          {bulkErrors.length > 5 ? ` | ${bulkErrors.length - 5} more...` : ""}
+        </div>
+      )}
 
       {showCreate && (
         <form onSubmit={submitCreate} style={panelStyle}>
@@ -733,6 +825,15 @@ export function UserListPage() {
                           <KeyIcon fontSize="small" />
                           Password
                         </button>
+                        {target.role_id === 4 && [1, 2, 5].includes(user?.role_id) && (
+                          <button
+                            type="button"
+                            onClick={() => upgradeToIc(target)}
+                            style={secondaryButtonStyle}
+                          >
+                            Upgrade to IC
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => deleteUser(target)}
@@ -753,10 +854,14 @@ export function UserListPage() {
       </div>
 
       <LoadingOverlay
-        show={loading || saving}
-        title={saving ? "Saving user" : "Loading users"}
+        show={loading || saving || bulkUploading}
+        title={bulkUploading ? "Uploading users" : saving ? "Saving user" : "Loading users"}
         message={
-          saving ? "Applying user management changes." : "Fetching user list."
+          bulkUploading
+            ? "Validating CSV rows and creating users."
+            : saving
+              ? "Applying user management changes."
+              : "Fetching user list."
         }
       />
     </PortalShell>

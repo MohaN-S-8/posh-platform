@@ -46,6 +46,8 @@ const emptyForm = {
   posh_policy: "",
   posh_policy_version: "",
   posh_policy_effective_date: "",
+  posh_policy_document_path: "",
+  posh_policy_document_name: "",
   corp_address: emptyAddress,
   billing_address: emptyAddress,
   account_contact: emptyContact,
@@ -163,6 +165,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [policyDocumentFile, setPolicyDocumentFile] = useState(null);
 
   const masterOptions = useCallback(
     (category) => masters.filter((item) => item.category === category && item.is_active),
@@ -202,6 +205,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
     const company = companies.find((item) => String(item.company_id) === String(companyId));
     if (!company) {
       setForm(emptyForm);
+      setPolicyDocumentFile(null);
       return;
     }
     setForm({
@@ -217,6 +221,8 @@ export function CompanyRegistrationContent({ embedded = false }) {
       posh_policy: company.posh_policy || "",
       posh_policy_version: company.posh_policy_version || "",
       posh_policy_effective_date: company.posh_policy_effective_date || "",
+      posh_policy_document_path: company.posh_policy_document_path || "",
+      posh_policy_document_name: company.posh_policy_document_name || "",
       corp_address: { ...emptyAddress, ...parseJson(company.corp_address_json, {}) },
       billing_address: { ...emptyAddress, ...parseJson(company.billing_address_json, {}) },
       account_contact: { ...emptyContact, ...parseJson(company.account_contact_json, {}) },
@@ -224,6 +230,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
       client_admin_password: "",
       branches: parseJson(company.branches_json, []),
     });
+    setPolicyDocumentFile(null);
   };
 
   const setField = (key, value) => {
@@ -294,6 +301,10 @@ export function CompanyRegistrationContent({ embedded = false }) {
       setError("Select an approved company first.");
       return;
     }
+    if (!form.posh_policy_document_path && !policyDocumentFile) {
+      setError("Upload the company PoSH policy PDF before saving registration.");
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess("");
@@ -318,6 +329,13 @@ export function CompanyRegistrationContent({ embedded = false }) {
         contact_email: form.coordinator_contact.email,
         contact_mobile: form.coordinator_contact.contact_no,
       });
+      if (policyDocumentFile) {
+        const filePayload = new FormData();
+        filePayload.append("file", policyDocumentFile);
+        await apiClient.post(`/companies/${form.company_id}/policy-document`, filePayload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
 
       let clientAdminMessage = "";
       if (user?.role_id === 2) {
@@ -338,6 +356,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
       }
 
       setSuccess(`Company registration saved.${clientAdminMessage}`);
+      setPolicyDocumentFile(null);
       await loadData();
     } catch (err) {
       setError(apiErrorMessage(err, "Failed to save company registration."));
@@ -354,7 +373,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
       <form style={panelStyle} onSubmit={saveRegistration}>
         <h3 style={panelTitleStyle}>Company Registration</h3>
         <p style={helperTextStyle}>
-          Only approved companies from Create Company & Work Order appear below. Coordinator Contact becomes the client&apos;s Client Admin login when saved by a Company Admin.
+          Only approved companies from Create Company & Work Order appear below. Coordinator Contact becomes the client&apos;s Client Admin login when saved by an Admin.
         </p>
 
         {loading ? (
@@ -424,6 +443,21 @@ export function CompanyRegistrationContent({ embedded = false }) {
                 <input type="date" value={form.posh_policy_effective_date} onChange={(event) => setField("posh_policy_effective_date", event.target.value)} style={inputStyle} />
               </label>
               <label style={labelStyle}>
+                Policy PDF
+                <input
+                  required={!form.posh_policy_document_path}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={(event) => setPolicyDocumentFile(event.target.files?.[0] || null)}
+                  style={inputStyle}
+                />
+                {(policyDocumentFile || form.posh_policy_document_name) && (
+                  <span style={helperTextStyle}>
+                    {policyDocumentFile?.name || form.posh_policy_document_name}
+                  </span>
+                )}
+              </label>
+              <label style={labelStyle}>
                 Employee Strength
                 <input type="number" min="0" value={form.employee_strength} onChange={(event) => setField("employee_strength", event.target.value)} style={inputStyle} />
               </label>
@@ -447,7 +481,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
 
             <EmployeeContactSection
               title="Coordinator Contact (Becomes Client Admin)"
-              description="Add the employee first in Employee Master, then pick them here - this employee becomes the Client Admin login."
+              description="Add the employee first in User Master, then pick them here - this employee becomes the Client Admin login."
               section="coordinator_contact"
               values={form.coordinator_contact}
               employees={employees}
@@ -536,7 +570,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
                 <tr>
                   <td colSpan={5} style={emptyCellStyle}>
                     {user?.role_id === 2
-                      ? "No approved companies assigned to this Company Admin. Ask Super Admin to assign the work-order service to this admin before approval."
+                      ? "No approved companies assigned to this Admin. Ask Super Admin to assign the work-order service to this admin before approval."
                       : "No approved companies available for registration."}
                   </td>
                 </tr>
@@ -583,7 +617,7 @@ export function CompanyRegistrationContent({ embedded = false }) {
   return (
     <PortalShell
       title="Company Registration"
-      subtitle="Company Admin registers clients, then assigns services such as PoSH separately."
+      subtitle="Admin registers clients, then assigns services such as PoSH separately."
     >
       {content}
     </PortalShell>
@@ -622,7 +656,7 @@ function AddressSection({ title, section, values, onChange, masterOptions }) {
 
 function EmployeeContactSection({
   title,
-  description = "Add the employee first in Employee Master, then pick them here.",
+  description = "Add the employee first in User Master, then pick them here.",
   section,
   values,
   employees,
@@ -666,7 +700,7 @@ function EmployeeContactSection({
             placeholder={
               activeEmployees.length
                 ? "Type name, email, or employee ID"
-                : "No active employees found - add or activate in Employee Master first"
+                : "No active employees found - add or activate in User Master first"
             }
             onChange={(event) => handleEmployeeSearch(event.target.value)}
             style={inputStyle}

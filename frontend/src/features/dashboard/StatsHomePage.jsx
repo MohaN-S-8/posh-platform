@@ -64,11 +64,19 @@ function metricSet(user, data) {
       { label: "Annual Returns Pending", value: data?.annual_returns?.pending ?? 0, trend: "Annual return module" },
     ];
   }
-  if (user?.role_id === 3 || user?.role_id === 5) {
+  if (user?.role_id === 3) {
+    return [
+      { label: "IC Courses", value: data?.total_courses ?? 0, trend: "Assigned IC training" },
+      { label: "Completed", value: data?.completed ?? 0, trend: "Training done" },
+      { label: "Pending", value: (data?.in_progress ?? 0) + (data?.not_started ?? 0), trend: "Still open" },
+      { label: "Certificates", value: data?.certificates ?? 0, trend: `${data?.completion_rate ?? 0}% complete` },
+    ];
+  }
+  if (user?.role_id === 5) {
     return [
       { label: "Employees", value: data?.total_employees ?? 0, trend: "Company records" },
       { label: "Departments", value: data?.department_breakdown?.length ?? 0, trend: "Active groups" },
-      { label: "Active Records", value: data?.total_employees ?? 0, trend: "Employee master" },
+      { label: "Active Records", value: data?.total_employees ?? 0, trend: "User Master" },
       { label: "Pending Follow-Up", value: data?.pending_followup ?? 0, trend: "Needs action" },
     ];
   }
@@ -83,7 +91,8 @@ function metricSet(user, data) {
 function loadEndpoint(user) {
   if (user?.role_id === 1) return "/analytics/overview";
   if (user?.role_id === 2) return "/analytics/current";
-  if (user?.role_id === 3 || user?.role_id === 5) return "/hr/employees/summary";
+  if (user?.role_id === 3) return "/employee/summary?training_type=ic";
+  if (user?.role_id === 5) return "/hr/employees/summary";
   return "/employee/summary";
 }
 
@@ -187,7 +196,7 @@ export function StatsHomePage() {
         title: "Hierarchy",
         rows: [
           ["Super Admin", data?.hierarchy?.super_admins ?? 0],
-          ["Company Admin", data?.hierarchy?.company_admins ?? 0],
+          ["Admin", data?.hierarchy?.company_admins ?? 0],
           ["Client / Management", data?.hierarchy?.client_management ?? 0],
           ["IC", data?.hierarchy?.hr_users ?? 0],
           ["Employees", data?.hierarchy?.employees ?? 0],

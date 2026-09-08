@@ -103,6 +103,12 @@ function buildSummary(analytics) {
   ];
 }
 
+function downloadNameFromResponse(res, fallback) {
+  const disposition = res.headers?.["content-disposition"] || "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || fallback;
+}
+
 export function HRReportsPage() {
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
@@ -142,7 +148,7 @@ export function HRReportsPage() {
       const url = URL.createObjectURL(res.data);
       const link = document.createElement("a");
       link.href = url;
-      link.download = report.fileName;
+      link.download = downloadNameFromResponse(res, report.fileName);
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {

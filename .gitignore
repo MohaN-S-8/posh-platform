@@ -50,3 +50,5 @@ docs/
 posh_schema.sql
 overview.md
 feature-files.md
+
+e2e/
