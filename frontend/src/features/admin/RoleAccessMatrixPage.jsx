@@ -3,13 +3,7 @@ import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { PortalShell } from "../../components/PortalShell";
 
-const roles = [
-  "Super Admin",
-  "Admin",
-  "Client Admin (Mgmt)",
-  "IC",
-  "Employee",
-];
+const roles = ["Super Admin", "Admin", "Client Admin (Mgmt)", "IC", "Employee"];
 
 const pages = [
   "Home",
@@ -51,7 +45,7 @@ const defaultAllowed = {
     "User Master",
     "Role & Access Matrix",
   ]),
-  "Admin": new Set([
+  Admin: new Set([
     "Home",
     "PoSH Policy",
     "PoSH Training",
@@ -59,7 +53,6 @@ const defaultAllowed = {
     "Company Setup",
     "User Master",
     "Create IC",
-    "Annual Returns",
   ]),
   "Client Admin (Mgmt)": new Set([
     "Home",
@@ -71,7 +64,6 @@ const defaultAllowed = {
     "POSH Complaints",
     "Audit",
     "Analytics & Reports",
-    "Annual Returns",
     "User Master",
     "Create IC",
   ]),

@@ -344,8 +344,16 @@ export function StatsHomePage() {
         .some((value) => String(value).toLowerCase().includes(query));
     });
   }, [data?.user_training_rows, departmentFilter, userSearchQuery]);
+  const employeeTrainingRows = useMemo(
+    () => trainingRows.filter((row) => Number(row.role_id) === 4 || row.role === "Employee"),
+    [trainingRows],
+  );
   const departments = useMemo(() => {
-    const values = new Set((data?.user_training_rows || []).map((row) => row.department || "Unassigned"));
+    const values = new Set(
+      (data?.user_training_rows || [])
+        .filter((row) => Number(row.role_id) === 4 || row.role === "Employee")
+        .map((row) => row.department || "Unassigned"),
+    );
     return ["All", ...Array.from(values).sort()];
   }, [data?.user_training_rows]);
   const portfolioStats = useMemo(() => {
@@ -601,7 +609,7 @@ export function StatsHomePage() {
             {["Completed", "Started", "Pending"].map((status) => (
               <div key={status} className="portal-card">
                 <div className="portal-kpi-value">
-                  {loading ? "-" : trainingRows.filter((row) => row.completion_status === status).length}
+                  {loading ? "-" : employeeTrainingRows.filter((row) => row.completion_status === status).length}
                 </div>
                 <div className="portal-kpi-label">{status}</div>
               </div>
@@ -633,7 +641,7 @@ export function StatsHomePage() {
                 </tr>
               </thead>
               <tbody>
-                {trainingRows.map((row) => (
+                {employeeTrainingRows.map((row) => (
                   <tr key={row.user_id} style={trStyle}>
                     <td style={tdStyle}>{row.name}</td>
                     <td style={tdStyle}>{row.employee_id}</td>
@@ -646,10 +654,10 @@ export function StatsHomePage() {
                     <td style={tdStyle}><Badge tone={row.certificate_status === "Valid" ? "green" : "red"}>{row.certificate_status}</Badge></td>
                   </tr>
                 ))}
-                {!loading && trainingRows.length === 0 && (
+                {!loading && employeeTrainingRows.length === 0 && (
                   <tr style={trStyle}>
                     <td colSpan={9} style={{ ...tdStyle, color: "var(--portal-muted)", textAlign: "center" }}>
-                      No users match this filter.
+                      No employees with video training match this filter.
                     </td>
                   </tr>
                 )}
