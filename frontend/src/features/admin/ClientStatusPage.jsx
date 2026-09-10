@@ -21,6 +21,7 @@ export function ClientStatusPage() {
   const [location, setLocation] = useState("");
   const [awarenessTraining, setAwarenessTraining] = useState("All");
   const [icTraining, setIcTraining] = useState("All");
+  const [meetingUpdatingKey, setMeetingUpdatingKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -106,6 +107,43 @@ export function ClientStatusPage() {
     setIcTraining("All");
   };
 
+  const updateCompanyMeeting = (companyId, quarter, completed) => {
+    setAnalytics((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        organizations: (current.organizations || []).map((company) => {
+          if (company.company_id !== companyId) return company;
+          return {
+            ...company,
+            ic_meetings: {
+              ...(company.ic_meetings || {}),
+              [quarter]: completed,
+            },
+          };
+        }),
+      };
+    });
+  };
+
+  const toggleIcMeeting = async (company, quarter, completed) => {
+    const key = `${company.company_id}-${quarter}`;
+    setMeetingUpdatingKey(key);
+    setError("");
+    updateCompanyMeeting(company.company_id, quarter, completed);
+    try {
+      await apiClient.patch(`/companies/${company.company_id}/ic-meetings`, {
+        quarter,
+        completed,
+      });
+    } catch (err) {
+      updateCompanyMeeting(company.company_id, quarter, !completed);
+      setError(apiErrorMessage(err, "Unable to update IC meeting status."));
+    } finally {
+      setMeetingUpdatingKey("");
+    }
+  };
+
   const exportCsv = () => {
     const rows = activeTab === tabs[0]
       ? complianceCsvRows(filteredCompanies)
@@ -189,7 +227,11 @@ export function ClientStatusPage() {
       {loading ? (
         <div style={emptyStyle}>Loading client status...</div>
       ) : activeTab === tabs[0] ? (
-        <CompanyComplianceTable companies={filteredCompanies} />
+        <CompanyComplianceTable
+          companies={filteredCompanies}
+          meetingUpdatingKey={meetingUpdatingKey}
+          onToggleMeeting={toggleIcMeeting}
+        />
       ) : (
         <EmployeeReportTable rows={filteredEmployees} />
       )}
@@ -257,7 +299,7 @@ function EmployeeFilters(props) {
   );
 }
 
-function CompanyComplianceTable({ companies }) {
+function CompanyComplianceTable({ companies, meetingUpdatingKey, onToggleMeeting }) {
   return (
     <div style={tableWrapStyle}>
       <table style={tableStyle}>
@@ -278,7 +320,13 @@ function CompanyComplianceTable({ companies }) {
               <td style={tdStyle}><StatusBadge status={company.services?.length ? "Completed" : "Pending"} /></td>
               <td style={tdStyle}><StatusBadge status={company.ic_users ? "Completed" : "Pending"} /></td>
               <td style={tdStyle}><StatusBadge status={company.services?.length ? "Completed" : "Pending"} /></td>
-              <td style={tdStyle}><QuarterChecks complete={company.ic_users > 0} /></td>
+              <td style={tdStyle}>
+                <QuarterChecks
+                  company={company}
+                  meetingUpdatingKey={meetingUpdatingKey}
+                  onToggleMeeting={onToggleMeeting}
+                />
+              </td>
               <td style={tdStyle}><StatusBadge status={company.annual_return_status === "Filed" ? "Completed" : "Pending"} /></td>
               <td style={tdStyle}><StatusBadge status={company.open_complaints ? `${company.open_complaints} Open` : "No Open Complaints"} /></td>
             </tr>
@@ -324,12 +372,19 @@ function EmployeeReportTable({ rows }) {
   );
 }
 
-function QuarterChecks({ complete }) {
+function QuarterChecks({ company, meetingUpdatingKey, onToggleMeeting }) {
+  const meetings = company.ic_meetings || {};
   return (
     <div style={quarterStyle}>
-      {["Q1", "Q2", "Q3", "Q4"].map((quarter, index) => (
+      {["Q1", "Q2", "Q3", "Q4"].map((quarter) => (
         <label key={quarter}>
-          <input type="checkbox" readOnly checked={complete && index === 0} /> {quarter}
+          <input
+            type="checkbox"
+            checked={Boolean(meetings[quarter])}
+            disabled={meetingUpdatingKey === `${company.company_id}-${quarter}`}
+            onChange={(event) => onToggleMeeting(company, quarter, event.target.checked)}
+          />{" "}
+          {quarter}
         </label>
       ))}
     </div>
@@ -460,6 +515,8 @@ EmployeeFilters.propTypes = {
 
 CompanyComplianceTable.propTypes = {
   companies: PropTypes.array.isRequired,
+  meetingUpdatingKey: PropTypes.string.isRequired,
+  onToggleMeeting: PropTypes.func.isRequired,
 };
 
 EmployeeReportTable.propTypes = {
@@ -467,7 +524,9 @@ EmployeeReportTable.propTypes = {
 };
 
 QuarterChecks.propTypes = {
-  complete: PropTypes.bool.isRequired,
+  company: PropTypes.object.isRequired,
+  meetingUpdatingKey: PropTypes.string.isRequired,
+  onToggleMeeting: PropTypes.func.isRequired,
 };
 
 StatusBadge.propTypes = {

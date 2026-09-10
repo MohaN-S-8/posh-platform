@@ -64,6 +64,7 @@ def _service_summary(service_details_json: str | None) -> dict:
             item.get("deliverables") or item.get("scope") or "PoSH Compliance" for item in posh_rows
         ]
         or [row.get("deliverables") or "PoSH Compliance"],
+        "ic_meetings": row.get("ic_meetings") if isinstance(row.get("ic_meetings"), dict) else {},
     }
 
 
@@ -509,6 +510,7 @@ async def _platform_overview(db: AsyncSession) -> dict:
                 "stop_date": service_summary["stop_date"],
                 "assigned_to_name": service_summary["assigned_to_name"],
                 "deliverables": service_summary["deliverables"],
+                "ic_meetings": service_summary["ic_meetings"],
                 "annual_return_status": org_annual_status,
                 "training_rate": training_rate,
                 "completed_training": completed_count,
@@ -780,6 +782,7 @@ async def _company_overview(db: AsyncSession, company_id: int) -> dict:
                     "stop_date": company_service_summary["stop_date"],
                     "assigned_to_name": company_service_summary["assigned_to_name"],
                     "deliverables": company_service_summary["deliverables"],
+                    "ic_meetings": company_service_summary["ic_meetings"],
                     "training_rate": compliance_rate,
                     "completed_training": company_completed.get(company.company_id, 0),
                     "open_complaints": company_open_complaints.get(company.company_id, 0),
@@ -910,6 +913,7 @@ async def _admin_overview(db: AsyncSession, current_user) -> dict:
                 "stop_date": service_summary["stop_date"],
                 "assigned_to_name": service_summary["assigned_to_name"],
                 "deliverables": service_summary["deliverables"],
+                "ic_meetings": service_summary["ic_meetings"],
                 "annual_return_status": org_annual_status,
                 "training_rate": training_rate,
                 "completed_training": completed_count,
