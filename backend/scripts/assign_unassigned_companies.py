@@ -1,4 +1,5 @@
 """Default existing unassigned work orders to the configured primary Super Admin."""
+
 import asyncio
 import json
 import sys
@@ -15,10 +16,23 @@ async def main():
     engine.echo = False
     async with AsyncSessionLocal() as db:
         primary = await db.get(UserMaster, settings.PRIMARY_SUPER_ADMIN_USER_ID)
-        if not primary or primary.role_id != 1 or primary.status != "Active" or primary.is_deleted != "N":
+        if (
+            not primary
+            or primary.role_id != 1
+            or primary.status != "Active"
+            or primary.is_deleted != "N"
+        ):
             raise RuntimeError("Configured primary Super Admin is not active.")
         changed = []
-        companies = (await db.execute(select(CompanyMaster).where(CompanyMaster.is_deleted == "N").with_for_update())).scalars().all()
+        companies = (
+            (
+                await db.execute(
+                    select(CompanyMaster).where(CompanyMaster.is_deleted == "N").with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
         for company in companies:
             try:
                 rows = json.loads(company.service_details_json or "[]")
@@ -29,7 +43,11 @@ async def main():
             updated = False
             for row in rows:
                 if isinstance(row, dict) and not row.get("assigned_to"):
-                    row.update(assigned_to=str(primary.user_id), assigned_to_name=f"{primary.first_name} {primary.last_name or ''}".strip(), assigned_to_role="Super Admin")
+                    row.update(
+                        assigned_to=str(primary.user_id),
+                        assigned_to_name=f"{primary.first_name} {primary.last_name or ''}".strip(),
+                        assigned_to_role="Super Admin",
+                    )
                     updated = True
             if updated:
                 company.service_details_json = json.dumps(rows)
@@ -38,7 +56,15 @@ async def main():
             await db.commit()
         else:
             await db.rollback()
-        print(json.dumps({"applied": "--apply" in sys.argv, "company_ids": changed, "assigned_to": primary.user_id}))
+        print(
+            json.dumps(
+                {
+                    "applied": "--apply" in sys.argv,
+                    "company_ids": changed,
+                    "assigned_to": primary.user_id,
+                }
+            )
+        )
     await engine.dispose()
 
 

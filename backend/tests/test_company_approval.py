@@ -28,7 +28,11 @@ async def test_approval_reports_assignment_and_policy_blockers_together():
 @pytest.mark.asyncio
 async def test_complete_company_can_be_approved():
     service = CompanyService()
-    company = SimpleNamespace(company_id=4, service_details_json='[{"scope":"POSH","assigned_to":2}]', approval_status="Pending")
+    company = SimpleNamespace(
+        company_id=4,
+        service_details_json='[{"scope":"POSH","assigned_to":2}]',
+        approval_status="Pending",
+    )
     service.get_by_id = AsyncMock(return_value=company)
     service._missing_registration_fields = lambda _: []
     service._send_assignment_emails = AsyncMock(return_value={"sent": 1})

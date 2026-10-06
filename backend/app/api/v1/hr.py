@@ -114,7 +114,9 @@ async def compliance_dashboard(
     total employees, completed, in-progress, not-started, compliance rate,
     department breakdown, and overdue employees list.
     """
-    return await hr_service.get_compliance_dashboard(db, await _report_company_scope(db, current_user))
+    return await hr_service.get_compliance_dashboard(
+        db, await _report_company_scope(db, current_user)
+    )
 
 
 @router.get("/reports/employees")

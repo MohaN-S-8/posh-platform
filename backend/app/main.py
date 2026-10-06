@@ -90,8 +90,15 @@ async def run_seed_on_startup():
     )
 
     async with engine.begin() as connection:
-        for table in (ExternalMember.__table__, ConstitutionLetter.__table__, NoticeDisplay.__table__, QuarterlyMeeting.__table__):
-            await connection.run_sync(lambda sync_connection, table=table: table.create(sync_connection, checkfirst=True))
+        for table in (
+            ExternalMember.__table__,
+            ConstitutionLetter.__table__,
+            NoticeDisplay.__table__,
+            QuarterlyMeeting.__table__,
+        ):
+            await connection.run_sync(
+                lambda sync_connection, table=table: table.create(sync_connection, checkfirst=True)
+            )
 
     async with AsyncSessionLocal() as db:
         await db.execute(

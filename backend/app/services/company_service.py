@@ -169,9 +169,19 @@ class CompanyService:
 
         # Only update fields that were actually sent
         update_data = data.model_dump(exclude_unset=True)
-        if company_id == 1 and "company_name" in update_data and update_data["company_name"] != company.company_name:
-            if current_user is None or current_user.role_id != 1 or current_user.user_id != settings.PRIMARY_SUPER_ADMIN_USER_ID:
-                raise HTTPException(403, "Only the primary Super Admin can change the default company name")
+        if (
+            company_id == 1
+            and "company_name" in update_data
+            and update_data["company_name"] != company.company_name
+        ):
+            if (
+                current_user is None
+                or current_user.role_id != 1
+                or current_user.user_id != settings.PRIMARY_SUPER_ADMIN_USER_ID
+            ):
+                raise HTTPException(
+                    403, "Only the primary Super Admin can change the default company name"
+                )
         if "service_details_json" in update_data or "company_code" in update_data:
             merged_data = {
                 "company_code": update_data.get("company_code", company.company_code),
@@ -516,7 +526,10 @@ class CompanyService:
         filters = [
             UserMaster.is_deleted == "N",
             UserMaster.status == "Active",
-            or_(UserMaster.role_id.in_(assignable_roles), UserMaster.user_id == settings.PRIMARY_SUPER_ADMIN_USER_ID),
+            or_(
+                UserMaster.role_id.in_(assignable_roles),
+                UserMaster.user_id == settings.PRIMARY_SUPER_ADMIN_USER_ID,
+            ),
         ]
         if current_user.role_id != 1:
             filters.append(UserMaster.company_id == current_user.company_id)
@@ -527,7 +540,8 @@ class CompanyService:
         return [
             {
                 "user_id": user.user_id,
-                "is_default_assignee": user.role_id == 1 and user.user_id == settings.PRIMARY_SUPER_ADMIN_USER_ID,
+                "is_default_assignee": user.role_id == 1
+                and user.user_id == settings.PRIMARY_SUPER_ADMIN_USER_ID,
                 "name": f"{user.first_name} {user.last_name or ''}".strip(),
                 "email": user.email,
                 "mobile": user.mobile,
@@ -912,7 +926,11 @@ class CompanyService:
         row = dict(row)
         row["scope"] = "POSH"
         if not row.get("assigned_to"):
-            row.update(assigned_to=str(settings.PRIMARY_SUPER_ADMIN_USER_ID), assigned_to_name="Primary Super Admin", assigned_to_role="Super Admin")
+            row.update(
+                assigned_to=str(settings.PRIMARY_SUPER_ADMIN_USER_ID),
+                assigned_to_name="Primary Super Admin",
+                assigned_to_role="Super Admin",
+            )
         row["deliverables"] = row.get("deliverables") or "PoSH Training & Compliance"
         if "deliverable_codes" in row:
             codes = row["deliverable_codes"]

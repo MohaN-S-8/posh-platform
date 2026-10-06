@@ -17,7 +17,9 @@ class BrandingInput(BaseModel):
     @field_validator("portal_name")
     @classmethod
     def valid_name(cls, value):
-        if not any(char.isalnum() for char in value) or any(ord(char) < 32 or char in "<>" for char in value):
+        if not any(char.isalnum() for char in value) or any(
+            ord(char) < 32 or char in "<>" for char in value
+        ):
             raise ValueError("Enter a valid portal name without markup or control characters")
         return value
 
@@ -38,7 +40,9 @@ async def branding_access(user=Depends(get_current_user)):
 
 
 @router.put("")
-async def update_branding(data: BrandingInput, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+async def update_branding(
+    data: BrandingInput, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)
+):
     if not is_primary(user):
         raise HTTPException(403, "Only the primary Super Admin can change the portal name")
     company = await db.get(CompanyMaster, 1)

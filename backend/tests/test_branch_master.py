@@ -86,7 +86,9 @@ async def test_template_is_valid_excel():
 
 @pytest.mark.asyncio
 async def test_bulk_upload_adds_rows_and_preserves_existing_branches(monkeypatch):
-    company = SimpleNamespace(company_id=2, company_name="Alpha", branches_json='[{"branch_id":"OLD"}]')
+    company = SimpleNamespace(
+        company_id=2, company_name="Alpha", branches_json='[{"branch_id":"OLD"}]'
+    )
     db = database_with(company)
     monkeypatch.setattr(branches, "employees_for", AsyncMock(return_value=[{"employee_id": "OWN"}]))
     file = upload_workbook([["Alpha", "Main", "BR1", "Chennai", "TN", "IN", "Road 1", "OWN"]])

@@ -86,9 +86,7 @@ async def _annual_status_by_company(
         company_id: (
             "Filed"
             if "Submitted" in status_set
-            else "Overdue"
-            if "Overdue" in status_set
-            else "Pending"
+            else "Overdue" if "Overdue" in status_set else "Pending"
         )
         for company_id, status_set in statuses.items()
     }
@@ -269,9 +267,7 @@ async def _user_training_rows(db: AsyncSession, company_ids: list[int] | None = 
         completion_status = (
             "Completed"
             if required_total and completed_history >= required_total
-            else "Started"
-            if total_history
-            else "Pending"
+            else "Started" if total_history else "Pending"
         )
         certificate_count = certificates.get(row.user_id, 0)
         role_name = ROLE_NAMES.get(row.role_id, "User")

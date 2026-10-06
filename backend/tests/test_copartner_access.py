@@ -25,10 +25,20 @@ class DB:
 async def test_independent_permissions_and_idempotent_seed():
     engine = create_engine("sqlite://")
     with Session(engine) as session:
-        session.execute(text("CREATE TABLE posh_role_access (id INTEGER PRIMARY KEY, role_label TEXT, access_item TEXT, access_status TEXT, is_allowed BOOLEAN, display_order INTEGER)"))
-        session.execute(text("INSERT INTO posh_role_access VALUES (1, 'Super Admin', 'PoSH Training', 'Access enabled', 1, 1)"))
+        session.execute(
+            text(
+                "CREATE TABLE posh_role_access (id INTEGER PRIMARY KEY, role_label TEXT, access_item TEXT, access_status TEXT, is_allowed BOOLEAN, display_order INTEGER)"
+            )
+        )
+        session.execute(
+            text(
+                "INSERT INTO posh_role_access VALUES (1, 'Super Admin', 'PoSH Training', 'Access enabled', 1, 1)"
+            )
+        )
         session.execute(SEED_COPARTNER)
-        session.execute(text("UPDATE posh_role_access SET is_allowed=0 WHERE role_label='Co-Partner'"))
+        session.execute(
+            text("UPDATE posh_role_access SET is_allowed=0 WHERE role_label='Co-Partner'")
+        )
         session.execute(SEED_COPARTNER)
         assert session.execute(text("SELECT count(*) FROM posh_role_access")).scalar() == 2
         db = DB(session)
@@ -49,5 +59,9 @@ async def test_independent_permissions_and_idempotent_seed():
 @pytest.mark.asyncio
 async def test_partner_cannot_modify_primary_matrix():
     with pytest.raises(HTTPException) as error:
-        await create_role_access(RoleAccessCreate(role_label="Super Admin", access_item="Home"), AsyncMock(), SimpleNamespace(role_id=1, user_id=settings.PRIMARY_SUPER_ADMIN_USER_ID + 1))
+        await create_role_access(
+            RoleAccessCreate(role_label="Super Admin", access_item="Home"),
+            AsyncMock(),
+            SimpleNamespace(role_id=1, user_id=settings.PRIMARY_SUPER_ADMIN_USER_ID + 1),
+        )
     assert error.value.status_code == 403

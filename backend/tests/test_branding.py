@@ -14,7 +14,9 @@ async def test_primary_updates_persisted_default_company():
     company = SimpleNamespace(company_name="Old Portal")
     db = SimpleNamespace(get=AsyncMock(return_value=company), commit=AsyncMock())
     user = SimpleNamespace(role_id=1, user_id=settings.PRIMARY_SUPER_ADMIN_USER_ID)
-    assert await update_branding(BrandingInput(portal_name="New Portal"), db, user) == {"portal_name": "New Portal"}
+    assert await update_branding(BrandingInput(portal_name="New Portal"), db, user) == {
+        "portal_name": "New Portal"
+    }
     db.commit.assert_awaited_once()
     assert await get_branding(db) == {"portal_name": "New Portal"}
 
@@ -24,7 +26,11 @@ async def test_primary_updates_persisted_default_company():
 async def test_other_users_cannot_rename(role, user_id):
     db = SimpleNamespace(get=AsyncMock(), commit=AsyncMock())
     with pytest.raises(HTTPException) as error:
-        await update_branding(BrandingInput(portal_name="New Portal"), db, SimpleNamespace(role_id=role, user_id=user_id))
+        await update_branding(
+            BrandingInput(portal_name="New Portal"),
+            db,
+            SimpleNamespace(role_id=role, user_id=user_id),
+        )
     assert error.value.status_code == 403
     db.commit.assert_not_awaited()
 

@@ -9,7 +9,9 @@ from app.models.company import CompanyMaster
 
 async def assigned_company_ids(db: AsyncSession, current_user) -> list[int]:
     if current_user.role_id == 1 and current_user.user_id == settings.PRIMARY_SUPER_ADMIN_USER_ID:
-        result = await db.execute(select(CompanyMaster.company_id).where(CompanyMaster.is_deleted == "N"))
+        result = await db.execute(
+            select(CompanyMaster.company_id).where(CompanyMaster.is_deleted == "N")
+        )
         return list(result.scalars().all())
     if current_user.role_id not in (1, 2):
         return [current_user.company_id]

@@ -51,7 +51,11 @@ async def get_my_role_access(
     role_label = ROLE_ACCESS_LABELS.get(current_user.role_id)
     if not role_label:
         return []
-    labels = ["Co-Partner"] if matrix_role(current_user) == "Co-Partner" else ROLE_ACCESS_ALIASES.get(current_user.role_id, [role_label])
+    labels = (
+        ["Co-Partner"]
+        if matrix_role(current_user) == "Co-Partner"
+        else ROLE_ACCESS_ALIASES.get(current_user.role_id, [role_label])
+    )
     for label in labels:
         result = await db.execute(
             text(

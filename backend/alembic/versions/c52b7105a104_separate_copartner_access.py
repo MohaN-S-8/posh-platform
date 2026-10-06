@@ -1,4 +1,5 @@
 """Separate Co-Partner permission records from Super Admin."""
+
 from alembic import op
 from app.core.role_matrix import SEED_COPARTNER
 

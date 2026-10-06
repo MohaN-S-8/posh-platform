@@ -27,6 +27,7 @@ def matrix_role(user):
         return "Co-Partner"
     return user.role_id
 
+
 PERMISSION_ACCESS_ITEMS = {
     "users.manage": ["User Master", "Employee Master", "Employee Master - PoSH"],
     "videos.upload": ["PoSH Training", "IC Member Training"],
@@ -319,7 +320,11 @@ def require_roles_or_matrix(role_ids: list[int], access_items: list[str]):
         db: AsyncSession = Depends(get_db),
     ):
         if current_user.role_id in role_ids:
-            if matrix_role(current_user) == "Co-Partner" and await _matrix_access_decision(db, matrix_role(current_user), access_items) is False:
+            if (
+                matrix_role(current_user) == "Co-Partner"
+                and await _matrix_access_decision(db, matrix_role(current_user), access_items)
+                is False
+            ):
                 raise HTTPException(403, "You do not have permission to access this resource.")
             return current_user
 
