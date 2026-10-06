@@ -1,3 +1,6 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
+import { PortalBrand } from "../../components/PortalBrand";
+import { useBrandingStore } from "../../store/brandingStore";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,6 +58,7 @@ const loginErrorStorageKey = "posh_login_error";
 const loginErrorVisibleMs = 60 * 1000;
 
 export function LoginPage() {
+  const portalName = useBrandingStore((state) => state.portalName);
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
   const [error, setError] = useState(() => sessionStorage.getItem(loginErrorStorageKey) || "");
@@ -122,12 +126,8 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
-      <Link to="/" className="auth-brand" aria-label="POSH platform home">
-        <span className="auth-brand-mark">P</span>
-        <span>
-          <strong>POSH</strong>
-          <small>Training Platform</small>
-        </span>
+      <Link to="/" className="auth-brand" aria-label={`${portalName} home`}>
+        <PortalBrand />
       </Link>
 
       <section className="auth-card auth-card-sm">
@@ -145,7 +145,7 @@ export function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <ValidatedForm error={error} fieldErrors={errors} onSubmit={handleSubmit(onSubmit)} noValidate>
           <div style={{ marginBottom: "20px" }}>
             <label htmlFor="email" style={labelStyle}>
               Email Address *
@@ -221,7 +221,7 @@ export function LoginPage() {
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
-        </form>
+        </ValidatedForm>
 
         {/* <button
           type="button"

@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useState, useRef } from "react";
 import apiClient from "../../api/client";
 import { PortalShell } from "../../components/PortalShell";
@@ -84,7 +85,7 @@ export function BulkUploadPage() {
           Download Template CSV
         </button>
 
-        <form onSubmit={handleUpload}>
+        <ValidatedForm error={error} onSubmit={handleUpload}>
           <div
             style={{
               border: "2px dashed #ddd",
@@ -100,6 +101,8 @@ export function BulkUploadPage() {
             <input
               type="file"
               ref={fileInputRef}
+              required
+              aria-label="Excel or CSV file"
               accept=".xlsx,.xls,.csv"
               style={{ fontSize: "14px" }}
             />
@@ -136,7 +139,7 @@ export function BulkUploadPage() {
           >
             {loading ? "Uploading..." : "Upload & Create Employees"}
           </button>
-        </form>
+        </ValidatedForm>
       </div>
 
       {result && (

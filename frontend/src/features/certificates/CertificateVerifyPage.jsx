@@ -1,4 +1,5 @@
 import BadgeIcon from "@mui/icons-material/Badge";
+import { useBrandingStore } from "../../store/brandingStore";
 import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PropTypes from "prop-types";
@@ -8,6 +9,7 @@ import apiClient from "../../api/client";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 
 export function CertificateVerifyPage() {
+  const portalName = useBrandingStore((state) => state.portalName);
   const { certificateNumber } = useParams();
   const [certificate, setCertificate] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +82,7 @@ export function CertificateVerifyPage() {
           Certificate Verification
         </h1>
         <p style={{ color: "#64748b", margin: "0 0 24px", lineHeight: 1.6 }}>
-          This public page checks the certificate number against XYZ Portal
+          This public page checks the certificate number against {portalName}
           records.
         </p>
 

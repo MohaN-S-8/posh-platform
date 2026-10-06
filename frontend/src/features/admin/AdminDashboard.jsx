@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PortalNameSettings } from "../../components/PortalNameSettings";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
@@ -224,7 +225,7 @@ export function AdminDashboard() {
 
   const stats = useMemo(() => {
     if (!analytics) return [];
-    if (user?.role_id === 1) {
+    if ([1, 2].includes(user?.role_id)) {
       return [
         { label: "Active Clients", value: analytics.companies?.active ?? analytics.total_companies ?? 0 },
         { label: "Active Employees", value: analytics.hierarchy?.employees ?? 0 },
@@ -308,6 +309,7 @@ export function AdminDashboard() {
       }
       subtitle="Manage the workflows available to your role."
     >
+      <PortalNameSettings />
       <section style={{ marginBottom: "28px" }}>
         <div className="portal-section-title">Programme Snapshot</div>
         <div className="portal-auto-grid">

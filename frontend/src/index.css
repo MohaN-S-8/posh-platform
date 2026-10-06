@@ -330,13 +330,25 @@ textarea {
 
 .landing-brand {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   color: var(--portal-text);
   text-decoration: none;
 }
 
+.dynamic-portal-brand { display: flex; align-items: center; justify-content: center; gap: 12px; max-width: 100%; margin-bottom: 16px; min-width: 0; }
+.dynamic-portal-brand strong { font-size: 18px; overflow-wrap: anywhere; min-width: 0; }
+.dynamic-portal-box { display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 48px; background: var(--portal-purple, #4a2e83); color: white; border-radius: 8px; font-size: 24px; font-weight: 700; }
+.auth-brand .dynamic-portal-brand { margin-bottom: 0; }
+.loading-brand-letters { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; max-width: 100%; margin: 0 auto 20px; }
+.loading-brand-letter { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 42px; border-radius: 6px; color: white; font-size: 20px; font-weight: 700; line-height: 1; box-shadow: 0 3px 7px #0002; animation: loadingLetterEnter 500ms ease both; }
+.loading-brand-space { flex: 0 0 10px; height: 42px; }
+@keyframes loadingLetterEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .loading-brand-letter { animation: none; } }
+
 .landing-brand-mark {
+  flex-shrink: 0;
   width: 38px;
   height: 38px;
   display: grid;
@@ -350,6 +362,7 @@ textarea {
 .landing-brand strong,
 .landing-brand small {
   display: block;
+  overflow-wrap: anywhere;
 }
 
 .landing-brand small {

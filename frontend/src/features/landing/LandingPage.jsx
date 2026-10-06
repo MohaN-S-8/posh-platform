@@ -1,4 +1,6 @@
 import PolicyIcon from "@mui/icons-material/Policy";
+import { LoadingBrand } from "../../components/LoadingBrand";
+import { useBrandingStore } from "../../store/brandingStore";
 import ShieldIcon from "@mui/icons-material/Shield";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
 import { useEffect, useState } from "react";
@@ -22,6 +24,7 @@ const values = [
 ];
 
 export function LandingPage() {
+  const portalName = useBrandingStore((state) => state.portalName);
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
@@ -33,17 +36,7 @@ export function LandingPage() {
     <div className="landing-page">
       {showSplash && (
         <div className="landing-splash" role="status" aria-live="polite">
-          <div className="landing-splash-flight" aria-label="POSH loading">
-            {["P", "O", "S", "H"].map((letter) => (
-              <span
-                key={letter}
-                className={`landing-splash-letter landing-splash-letter-${letter.toLowerCase()}`}
-              >
-                <span className="landing-splash-trail" />
-                {letter}
-              </span>
-            ))}
-          </div>
+          <div style={{ width: "min(100%, 720px)", minWidth: 0 }} aria-label={`${portalName} loading`}><LoadingBrand /></div>
           <div className="landing-splash-united">...</div>
           <div className="landing-splash-loader" aria-hidden="true">
             <span />
@@ -53,11 +46,10 @@ export function LandingPage() {
         </div>
       )}
       <header className="landing-nav">
-        <Link to="/" className="landing-brand" aria-label="POSH platform home">
-          <span className="landing-brand-mark">P</span>
+        <Link to="/" className="landing-brand" aria-label={`${portalName} home`}>
+          <span className="landing-brand-mark" aria-hidden="true">{Array.from(portalName.trim())[0]?.toUpperCase()}</span>
           <span>
-            <strong>POSH</strong>
-            <small>Training Platform</small>
+            <strong>{portalName}</strong>
           </span>
         </Link>
         <nav className="landing-nav-actions" aria-label="Account access">
@@ -74,7 +66,7 @@ export function LandingPage() {
           </div>
           <div className="landing-hero-content">
             <p className="landing-eyebrow">Workplace safety and compliance services</p>
-            <h1>XYZ Portal</h1>
+            <h1>{portalName}</h1>
             <p className="landing-hero-copy">
               A role-based compliance platform for prevention of sexual harassment
               training, employee certification, reporting, and governance.

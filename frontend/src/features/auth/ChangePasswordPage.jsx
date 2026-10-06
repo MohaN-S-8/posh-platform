@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useState } from "react";
 import apiClient from "../../api/client";
 import { PortalShell } from "../../components/PortalShell";
@@ -51,7 +52,7 @@ export function ChangePasswordPage() {
       >
         {error && <div style={messageStyle("#fff7f6", "#f3b4ae", "#c0392b")}>{error}</div>}
         {success && <div style={messageStyle("#e8f5ee", "#1f7a4d", "#1f7a4d")}>{success}</div>}
-        <form onSubmit={submit} style={{ display: "grid", gap: "14px" }}>
+        <ValidatedForm error={error} validate={() => form.new_password && form.confirm_password && form.new_password !== form.confirm_password ? ["Confirm Password must match New Password."] : []} onSubmit={submit} style={{ display: "grid", gap: "14px" }}>
           <label style={labelStyle}>
             Current Password
             <input
@@ -101,7 +102,7 @@ export function ChangePasswordPage() {
           >
             {saving ? "Changing..." : "Change Password"}
           </button>
-        </form>
+        </ValidatedForm>
       </div>
     </PortalShell>
   );

@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useEffect, useMemo, useState } from "react";
 import BusinessIcon from "@mui/icons-material/Business";
 import ChecklistIcon from "@mui/icons-material/Checklist";
@@ -257,7 +258,7 @@ export function AdminConfigPage() {
           </section>
 
           <section style={editorGridStyle}>
-            <form onSubmit={saveMaster} style={editorPanelStyle}>
+            <ValidatedForm error={error} onSubmit={saveMaster} style={editorPanelStyle}>
               <h3 style={editorTitleStyle}>{editing.type === "master" ? "Edit 1A Master" : "Add 1A Master"}</h3>
               <label style={labelStyle}>Category
                 <select value={masterForm.category} onChange={(e) => setMasterForm({ ...masterForm, category: e.target.value })} style={inputStyle}>
@@ -283,9 +284,9 @@ export function AdminConfigPage() {
                 <button type="submit" disabled={saving} style={primaryButtonStyle}>{saving ? "Saving..." : "Save Master"}</button>
                 <button type="button" onClick={resetForms} style={secondaryButtonStyle}>Clear</button>
               </div>
-            </form>
+            </ValidatedForm>
 
-            <form onSubmit={saveOffice} style={editorPanelStyle}>
+            <ValidatedForm error={error} onSubmit={saveOffice} style={editorPanelStyle}>
               <h3 style={editorTitleStyle}>{editing.type === "office" ? "Edit POSH Office" : "Add POSH Office"}</h3>
               <label style={labelStyle}>Office Name
                 <input required value={officeForm.office_name} onChange={(e) => setOfficeForm({ ...officeForm, office_name: e.target.value.toUpperCase() })} style={inputStyle} />
@@ -327,9 +328,9 @@ export function AdminConfigPage() {
                 <button type="submit" disabled={saving} style={primaryButtonStyle}>Save Office</button>
                 <button type="button" onClick={resetForms} style={secondaryButtonStyle}>Clear</button>
               </div>
-            </form>
+            </ValidatedForm>
 
-            <form onSubmit={saveAccess} style={editorPanelStyle}>
+            <ValidatedForm error={error} onSubmit={saveAccess} style={editorPanelStyle}>
               <h3 style={editorTitleStyle}>{editing.type === "access" ? "Edit Role Access" : "Add Role Access"}</h3>
               <label style={labelStyle}>Role
                 <select value={accessForm.role_label} onChange={(e) => setAccessForm({ ...accessForm, role_label: e.target.value })} style={inputStyle}>
@@ -355,7 +356,7 @@ export function AdminConfigPage() {
                 <button type="submit" disabled={saving} style={primaryButtonStyle}>Save Access</button>
                 <button type="button" onClick={resetForms} style={secondaryButtonStyle}>Clear</button>
               </div>
-            </form>
+            </ValidatedForm>
           </section>
 
           <section style={{ marginBottom: "24px" }}>

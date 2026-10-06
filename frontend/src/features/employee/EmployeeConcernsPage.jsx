@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SendIcon from "@mui/icons-material/Send";
 import PropTypes from "prop-types";
@@ -91,7 +92,7 @@ export function EmployeeConcernsPage() {
       {success && <div style={successStyle}>{success}</div>}
 
       <div style={topGridStyle}>
-        <form onSubmit={submitConcern} className="portal-card" style={{ display: "grid", gap: "12px" }}>
+        <ValidatedForm error={error} onSubmit={submitConcern} className="portal-card" style={{ display: "grid", gap: "12px" }}>
           <div className="portal-section-title" style={{ marginTop: 0 }}>
             File a Complaint
           </div>
@@ -130,7 +131,7 @@ export function EmployeeConcernsPage() {
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button
               type="submit"
-              disabled={submitting || !form.message.trim()}
+              disabled={submitting}
               className="portal-primary-btn"
             >
               <SendIcon fontSize="small" />
@@ -145,7 +146,7 @@ export function EmployeeConcernsPage() {
               Raise an Informal Concern
             </button>
           </div>
-        </form>
+        </ValidatedForm>
 
         <section className="portal-card" style={{ display: "grid", gap: "14px" }}>
           <div className="portal-section-title" style={{ margin: 0 }}>

@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../api/client";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
@@ -191,7 +192,11 @@ export function TrainingAssignPage() {
     >
       <div className="portal-section-title">Assignment Details</div>
       <div className="portal-card" style={{ maxWidth: "820px" }}>
-        <form onSubmit={handleSubmit}>
+        <ValidatedForm error={error} validate={() => [
+          ...(!form.video_id || selectedVideo?.status !== "Published" ? ["Select a published training video."] : []),
+          ...(form.assign_type === "Individual" && !form.assigned_to_user_id ? ["Select an employee for this assignment."] : []),
+          ...(form.assign_type === "Department" && !form.assigned_to_department ? ["Select a department for this assignment."] : []),
+        ]} onSubmit={handleSubmit}>
           <div style={filterGridStyle}>
             <div>
               <label style={labelStyle}>Training Level</label>
@@ -418,24 +423,24 @@ export function TrainingAssignPage() {
 
           <button
             type="submit"
-            disabled={submitting || loadingOptions || !canSubmit}
+            disabled={submitting || loadingOptions}
             style={{
               padding: "10px 28px",
               background:
-                submitting || loadingOptions || !canSubmit
+                submitting || loadingOptions
                   ? "#c8b7dc"
                   : "var(--portal-pink)",
               color: "white",
               border: "none",
               borderRadius: "8px",
               cursor:
-                submitting || loadingOptions || !canSubmit ? "not-allowed" : "pointer",
+                submitting || loadingOptions ? "not-allowed" : "pointer",
               fontWeight: 700,
             }}
           >
             {submitting ? "Assigning..." : "Assign Training"}
           </button>
-        </form>
+        </ValidatedForm>
       </div>
 
       <LoadingOverlay

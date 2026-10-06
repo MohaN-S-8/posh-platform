@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
@@ -243,7 +244,7 @@ export function CreateIcPage() {
             ? "Update IC user details and optionally set a new password."
             : "Select an existing Employee from User Master. Their ID, email, contact, and username are filled automatically before upgrading access."}
         </p>
-        <form onSubmit={submitIc}>
+        <ValidatedForm error={error} validate={() => !editingIc && !selectedEmployee ? ["Select an employee from User Master for IC access."] : []} onSubmit={submitIc}>
           {!editingIc && (
             <label style={{ ...labelStyle, marginBottom: "16px" }}>
               Search Employee *
@@ -275,6 +276,7 @@ export function CreateIcPage() {
               <input
                 required
                 value={form.name}
+                data-validation="person"
                 placeholder="Full name"
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
                 style={inputStyle}
@@ -362,7 +364,7 @@ export function CreateIcPage() {
               </button>
             )}
           </div>
-        </form>
+        </ValidatedForm>
       </section>
 
       <section>

@@ -1,5 +1,7 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import { MasterCityInput } from "../../components/MasterCityInput";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { PortalShell } from "../../components/PortalShell";
@@ -85,7 +87,6 @@ const clientDataFields = [
 
 const workOrderFields = [
   ["client_id", "Client ID", "readonly"],
-  ["deliverables", "Deliverables"],
   ["start_date", "Start Date", "date"],
   ["stop_date", "Stop Date", "date"],
   ["frequency", "Frequency", "frequency"],
@@ -183,17 +184,17 @@ const parseBranchCsv = (text) => {
     .filter((branch) => Object.values(branch).some((value) => String(value || "").trim()));
 };
 
-const setJsonObjectValue = (setForm, key, fallback, field, value) => {
+const setJsonObjectValue = (setForm, key, fallback, field, value, geography = {}) => {
   setForm((current) => {
     const row = getJsonObject(current, key, fallback);
-    return { ...current, [key]: JSON.stringify({ ...row, [field]: value }) };
+    return { ...current, [key]: JSON.stringify({ ...row, ...(["state", "country"].includes(field) ? { city: "" } : {}), [field]: value, ...geography }) };
   });
 };
 
-const setJsonArrayValue = (setForm, key, index, field, value) => {
+const setJsonArrayValue = (setForm, key, index, field, value, geography = {}) => {
   setForm((current) => {
     const rows = getJsonArray(current, key).map((row) => ({ ...row }));
-    rows[index] = { ...rows[index], [field]: value };
+    rows[index] = { ...rows[index], ...(["state", "country"].includes(field) ? { city: "" } : {}), [field]: value, ...geography };
     return { ...current, [key]: JSON.stringify(rows) };
   });
 };
@@ -329,6 +330,13 @@ export function CompanyListPage() {
     try {
       const res = await apiClient.get("/companies/assignable-users/");
       setAssignableUsers(res.data || []);
+      const primary = (res.data || []).find((item) => item.is_default_assignee);
+      if (primary) setForm((current) => {
+        const rows = fixedPoshServiceRows(current);
+        if (rows[0].assigned_to) return current;
+        rows[0] = { ...rows[0], assigned_to: String(primary.user_id), assigned_to_name: primary.name, assigned_to_role: primary.role_label };
+        return { ...current, service_details_json: JSON.stringify(rows) };
+      });
     } catch {
       setAssignableUsers([]);
     }
@@ -356,6 +364,8 @@ export function CompanyListPage() {
 
   const normalizePayload = () => {
     const serviceRows = fixedPoshServiceRows(form);
+    serviceRows[0].deliverable_codes = selectedDeliverableCodes;
+    serviceRows[0].deliverables = deliverableOptions.filter((item) => selectedDeliverableCodes.includes(item.code)).map((item) => item.name).join(", ");
     return {
       ...form,
       reference_no: form.reference_no || nextReferenceNo(companies),
@@ -418,12 +428,15 @@ export function CompanyListPage() {
   };
 
   const openCreate = () => {
+    const primary = assignableUsers.find((item) => item.is_default_assignee);
+    const rows = fixedPoshServiceRows(emptyForm);
+    if (primary) rows[0] = { ...rows[0], assigned_to: String(primary.user_id), assigned_to_name: primary.name, assigned_to_role: primary.role_label };
     setEditingCompany(null);
     setSelectedExistingCompany(null);
     setForm({
       ...emptyForm,
       reference_no: nextReferenceNo(companies),
-      service_details_json: JSON.stringify(fixedPoshServiceRows(emptyForm)),
+      service_details_json: JSON.stringify(rows),
       scope_codes_json: JSON.stringify([POSH_SERVICE_CODE]),
       certificate_issue_mode: "Automatic",
     });
@@ -452,6 +465,14 @@ export function CompanyListPage() {
 
   const saveCompany = async (e) => {
     e.preventDefault();
+    if (!selectedDeliverableCodes.length) {
+      setError("Select at least one deliverable from Masters.");
+      return;
+    }
+    if (fixedPoshServiceRows(form).some((row) => !row.assigned_to)) {
+      setError("Select an admin in Assigned To for the POSH service before submitting for approval.");
+      return;
+    }
     if (!form.industry_type?.trim()) {
       setError("Industry is required before submitting for approval.");
       return;
@@ -550,7 +571,11 @@ export function CompanyListPage() {
       }
       await fetchCompanies();
     } catch (err) {
+      if (err.response?.status === 400) {
+        await openEdit(company);
+      }
       setError(apiErrorMessage(err, "Failed to approve company work order."));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setApprovingCompanyId(null);
     }
@@ -572,6 +597,10 @@ export function CompanyListPage() {
   };
 
   const poshService = fixedPoshServiceRows(form)[0];
+  const deliverableOptions = masterOptions("Deliverables");
+  const selectedDeliverableCodes = Array.isArray(poshService.deliverable_codes)
+    ? poshService.deliverable_codes
+    : editingCompany || selectedExistingCompany ? deliverableOptions.map((item) => item.code) : [];
   const poshPreviewClientId =
     poshService.client_id ||
     generateClientIdPreview(form.company_code, POSH_SERVICE_CODE, nextClientSequence(companies));
@@ -636,7 +665,7 @@ export function CompanyListPage() {
         ))}
       </datalist>
 
-      {error && <div style={errorStyle}>{error}</div>}
+      {error && <div role="alert" style={errorStyle}>{error}</div>}
       {success && <div style={successStyle}>{success}</div>}
 
       {showForm && (
@@ -647,7 +676,7 @@ export function CompanyListPage() {
           <p style={helperTextStyle}>
             Reference No auto-generates as Running No / Year. Company Code derives from the first 4 letters of the company name. Selecting one or more scopes generates a Client ID per scope automatically.
           </p>
-          <form onSubmit={saveCompany}>
+          <ValidatedForm error={error} validate={() => selectedDeliverableCodes.length ? [] : ["Select at least one deliverable from Masters."]} onSubmit={saveCompany}>
             <div style={formGridStyle}>
               {fields
                 .filter((field) => !editingCompany || !field.createOnly)
@@ -748,6 +777,19 @@ export function CompanyListPage() {
                         </strong>
                       </div>
                       <div style={formGridStyle}>
+                        <fieldset style={{ gridColumn: "1 / -1", border: "1px solid var(--portal-border)", borderRadius: "6px", padding: "12px" }}>
+                          <legend style={labelStyle}>Deliverables *</legend>
+                          <div style={formGridStyle}>
+                            {deliverableOptions.map((item) => <label key={item.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                              <input type="checkbox" checked={selectedDeliverableCodes.includes(item.code)} onChange={(event) => {
+                                const codes = event.target.checked ? [...selectedDeliverableCodes, item.code] : selectedDeliverableCodes.filter((code) => code !== item.code);
+                                setJsonArrayValue(setForm, "service_details_json", 0, "deliverable_codes", codes, { scope: POSH_SERVICE_CODE });
+                              }} />
+                              {item.name}
+                            </label>)}
+                            {!deliverableOptions.length && <span>No active deliverables in Masters.</span>}
+                          </div>
+                        </fieldset>
                         {workOrderFields.map(([field, label, type = "text"]) => (
                           <label key={`work-posh-${field}`} style={labelStyle}>
                             {label}
@@ -774,6 +816,7 @@ export function CompanyListPage() {
                               </select>
                             ) : type === "assigned" ? (
                               <select
+                                required
                                 value={poshService[field] || ""}
                                 onChange={(e) => {
                                   const user = assignableUsers.find((item) => String(item.user_id) === e.target.value);
@@ -1010,7 +1053,7 @@ export function CompanyListPage() {
                 Cancel
               </button>
             </div>
-          </form>
+          </ValidatedForm>
 
         </div>
       )}
@@ -1168,8 +1211,8 @@ export function CompanyListPage() {
 
 function CompanyAddressFields({ title, jsonKey, form, setForm, masterOptions }) {
   const values = getJsonObject(form, jsonKey, emptyAddress);
-  const update = (field, value) =>
-    setJsonObjectValue(setForm, jsonKey, emptyAddress, field, value);
+  const update = (field, value, geography) =>
+    setJsonObjectValue(setForm, jsonKey, emptyAddress, field, value, geography);
 
   return (
     <div style={panelInsetStyle}>
@@ -1189,7 +1232,7 @@ function CompanyAddressFields({ title, jsonKey, form, setForm, masterOptions }) 
         </label>
         <label style={labelStyle}>
           City *
-          <input required list="city-code-options" value={values.city || ""} onChange={(event) => update("city", event.target.value)} style={inputStyle} />
+          <MasterCityInput autoMap required value={values.city || ""} state={values.state} country={values.country} onChange={(value, geography) => update("city", value, geography)} />
         </label>
         <label style={labelStyle}>
           State *
@@ -1229,7 +1272,7 @@ function CompanyContactFields({ title, jsonKey, form, setForm, onContactSync }) 
       <div style={formGridStyle}>
         <label style={labelStyle}>
           Name *
-          <input required value={values.name || ""} onChange={(event) => update("name", event.target.value)} style={inputStyle} />
+          <input required data-validation="person" value={values.name || ""} onChange={(event) => update("name", event.target.value)} style={inputStyle} />
         </label>
         <label style={labelStyle}>
           Designation *
@@ -1311,7 +1354,10 @@ function CompanyBranchFields({ form, setForm }) {
             ].map(([field, label]) => (
               <label key={field} style={labelStyle}>
                 {label}
-                <input
+                {field === "city" ? (
+                  <MasterCityInput autoMap value={branch.city || ""} state={branch.state} country={branch.country}
+                    onChange={(value, geography) => setJsonArrayValue(setForm, "branches_json", index, field, value, geography)} />
+                ) : <input
                   value={branch[field] || ""}
                   onChange={(event) =>
                     setJsonArrayValue(
@@ -1323,7 +1369,7 @@ function CompanyBranchFields({ form, setForm }) {
                     )
                   }
                   style={inputStyle}
-                />
+                />}
               </label>
             ))}
           </div>

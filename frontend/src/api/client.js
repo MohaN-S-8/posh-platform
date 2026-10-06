@@ -1,4 +1,5 @@
 import axios from "axios";
+import { startActionNotification, finishActionNotification, failActionNotification } from "./actionNotifications";
 
 const apiClient = axios.create({
   baseURL: "/api/v1",
@@ -13,6 +14,7 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  startActionNotification(config);
   return config;
 });
 
@@ -48,5 +50,7 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+apiClient.interceptors.response.use(finishActionNotification, failActionNotification);
 
 export default apiClient;

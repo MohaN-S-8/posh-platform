@@ -1,4 +1,6 @@
 import ShieldIcon from "@mui/icons-material/Shield";
+import { useBrandingStore } from "../../store/brandingStore";
+import { PortalNameSettings } from "../../components/PortalNameSettings";
 import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../api/client";
@@ -11,13 +13,13 @@ const roleContent = {
   1: {
     title: "Super Admin Home",
     subtitle: "XYZ Portal overview across services, organizations, users, certificates, and approvals.",
-    scope: "All companies",
+    scope: "Assigned companies",
     checklist: ["Companies configured", "Services assigned", "Certificates issued", "Reports available"],
   },
   2: {
     title: "Admin Home",
     subtitle: "Company-level PoSH operations, training governance, certificates, and received concerns.",
-    scope: "Your company",
+    scope: "Assigned companies",
     checklist: ["Client / Management users created", "Training videos published", "Certificates configured", "Concerns reviewed"],
   },
   5: {
@@ -41,26 +43,16 @@ const roleContent = {
 };
 
 function metricSet(user, data) {
-  if (user?.role_id === 1) {
+  if ([1, 2].includes(user?.role_id)) {
     return [
-      { label: "Active Clients", value: data?.companies?.active ?? data?.total_companies ?? 0, trend: "Platform live data" },
-      { label: "Active Employees", value: data?.hierarchy?.employees ?? 0, trend: "Across all companies" },
+      { label: "Active Clients", value: data?.companies?.active ?? data?.total_companies ?? 0, trend: "Assigned companies" },
+      { label: "Active Employees", value: data?.hierarchy?.employees ?? 0, trend: "Across assigned companies" },
       { label: "Completed Training", value: data?.total_course_completions ?? 0, trend: "Training completions" },
       {
         label: "Completed Pending",
         value: Math.max((data?.hierarchy?.employees ?? 0) - (data?.training?.completed_users ?? 0), 0),
         trend: "Not completed yet",
       },
-      { label: "Annual Returns Completed", value: data?.annual_returns?.completed ?? 0, trend: "Annual return module" },
-      { label: "Annual Returns Pending", value: data?.annual_returns?.pending ?? 0, trend: "Annual return module" },
-    ];
-  }
-  if (user?.role_id === 2) {
-    return [
-      { label: "Active Clients", value: data?.client_management_users ?? data?.total_users ?? 0, trend: "Client / Mgmt accounts" },
-      { label: "Active Employees", value: data?.total_employees ?? 0, trend: "Company records" },
-      { label: "Completed Training", value: data?.completed_training ?? 0, trend: "Training completions" },
-      { label: "Completed Pending", value: (data?.in_progress_training ?? 0) + (data?.not_started_training ?? 0), trend: "Still open" },
       { label: "Annual Returns Completed", value: data?.annual_returns?.completed ?? 0, trend: "Annual return module" },
       { label: "Annual Returns Pending", value: data?.annual_returns?.pending ?? 0, trend: "Annual return module" },
     ];
@@ -265,6 +257,7 @@ function formatDateTime(value) {
 }
 
 export function StatsHomePage() {
+  const portalName = useBrandingStore((state) => state.portalName);
   const { user } = useAuthStore();
   const [data, setData] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -463,7 +456,8 @@ export function StatsHomePage() {
   }, [data, user?.role_id]);
 
   return (
-    <PortalShell title={content.title} subtitle={content.subtitle}>
+    <PortalShell title={content.title} subtitle={content.subtitle.replace("XYZ Portal", portalName)}>
+      <PortalNameSettings />
       {error && (
         <div className="portal-card portal-home-error">
           {error}
@@ -487,7 +481,7 @@ export function StatsHomePage() {
           </div>
           <div className="portal-home-shield">
             <ShieldIcon />
-            <span>XYZ</span>
+            <span>{portalName}</span>
           </div>
         </section>
       )}
@@ -669,7 +663,7 @@ export function StatsHomePage() {
 
       {user?.role_id === 1 && (
         <section style={sectionStyle}>
-          <div className="portal-section-title">XYZ Hierarchy, Services & Organizations</div>
+          <div className="portal-section-title">{portalName} Hierarchy, Services & Organizations</div>
           <div className="portal-auto-grid">
             {superAdminSections.map((section) => (
               <article key={section.title} className="portal-card">
@@ -725,7 +719,7 @@ export function StatsHomePage() {
       <LoadingOverlay
         show={loading}
         title="Loading home"
-        message="Preparing your role-based XYZ Portal home page."
+        message={`Preparing your ${portalName} home page.`}
       />
     </PortalShell>
   );

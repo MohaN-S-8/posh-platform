@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { LoadingBrand } from "./LoadingBrand";
 
 export function LoadingOverlay({ show, title = "Working...", message = "Please wait." }) {
   if (!show) return null;
@@ -28,6 +29,7 @@ export function LoadingOverlay({ show, title = "Working...", message = "Please w
           border: "1px solid #e2e8f0",
         }}
       >
+        <LoadingBrand />
         <div
           style={{
             width: "42px",

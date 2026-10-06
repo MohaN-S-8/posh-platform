@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import { useEffect, useRef, useState } from "react";
 // import { useLocation, useNavigate } from "react-router-dom";
 import apiClient from "../../api/client";
@@ -448,7 +449,7 @@ export function VideoListPage() {
       )}
 
       {editingVideo && canManageVideos && (
-        <form onSubmit={submitEdit} style={panelStyle}>
+        <ValidatedForm error={error} onSubmit={submitEdit} style={panelStyle}>
           <h3 style={{ color: "#17324d", marginTop: 0 }}>Edit Video</h3>
           <div style={editGridStyle}>
             <label style={labelStyle}>
@@ -578,7 +579,7 @@ export function VideoListPage() {
               Cancel
             </button>
           </div>
-        </form>
+        </ValidatedForm>
       )}
 
       <div
@@ -595,7 +596,7 @@ export function VideoListPage() {
           Supported formats: MP4, AVI, MOV. Maximum size: 500MB. Videos are
           stored securely and remain private until published.
         </p>
-        <form onSubmit={handleUpload}>
+        <ValidatedForm error={error} onSubmit={handleUpload}>
           <div
             style={{
               display: "grid",
@@ -725,6 +726,8 @@ export function VideoListPage() {
             <input
               type="file"
               ref={fileInputRef}
+              required
+              aria-label="Video File"
               accept=".mp4,.avi,.mov"
               style={{ fontSize: "14px" }}
             />
@@ -806,7 +809,7 @@ export function VideoListPage() {
           >
             {uploading ? "Uploading..." : "Upload Video"}
           </button>
-        </form>
+        </ValidatedForm>
       </div>
 
       <div

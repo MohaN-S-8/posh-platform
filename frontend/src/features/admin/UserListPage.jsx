@@ -1,3 +1,5 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
+import { useBrandingStore } from "../../store/brandingStore";
 import AddIcon from "@mui/icons-material/Add";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import KeyIcon from "@mui/icons-material/Key";
@@ -7,13 +9,17 @@ import { useLocation } from "react-router-dom";
 import apiClient from "../../api/client";
 import { apiErrorMessage } from "../../api/errors";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
+import { MasterCityInput } from "../../components/MasterCityInput";
+import { BranchMasterSelect } from "../../components/BranchMasterSelect";
+import { branchFields, clearedBranchFields } from "../../utils/branchFields";
+import { employeePersonalOptions, normalizeEmployeeStatus, showEmploymentField } from "../../utils/employeeOptions";
 import { PortalShell } from "../../components/PortalShell";
 import { useAuthStore } from "../../store/authStore";
 
 const ROLES = {
   1: "Super Admin",
   2: "Admin",
-  5: "Admin",
+  5: "Client Admin",
   3: "IC",
   4: "Employee",
 };
@@ -25,10 +31,11 @@ const ROLE_CREATE_FLOW = {
   3: [],
 };
 
-function defaultRoleFor(user) {
-  if (user?.role_id === 1) return 2;
-  return ROLE_CREATE_FLOW[user?.role_id]?.[0] || 4;
+function defaultRoleFor(user, companyId = user?.company_id) {
+  if (user?.role_id === 1 && Number(companyId) === 1) return 2;
+  return 4;
 }
+
 
 function defaultIcRoleFor(roleId) {
   return Number(roleId) === 3 ? "Admin" : "";
@@ -143,17 +150,18 @@ const personalFields = [
 ];
 
 const employmentFields = [
+  ["employee_status", "Status of Employee"],
+  ["employment_status", "Employment Status"],
   ["joining_date", "Date of Joining", "date"],
   ["designation", "Designation"],
   ["department", "Department"],
   ["transfer_location", "Location / City"],
-  ["employment_status", "Employment Status"],
-  ["employee_status", "Status of Employee"],
   ["resignation_date", "Date of Resignation", "date"],
   ["resignation_reason", "Reason for Resignation"],
   ["reporting_to", "Reporting To"],
   ["branch_name", "Branch Name"],
   ["branch_id", "Branch ID"],
+  ["transfer_enabled", "Transfer", "checkbox"],
   ["transfer_date", "Transfer Date", "date"],
   ["transfer_branch_name", "Transfer Branch Name"],
   ["transfer_branch_id", "Transfer Branch ID"],
@@ -161,6 +169,7 @@ const employmentFields = [
 ];
 
 export function UserListPage() {
+  const PORTAL_COMPANY_NAME = useBrandingStore((state) => state.portalName);
   const location = useLocation();
   const { user } = useAuthStore();
   const [users, setUsers] = useState([]);
@@ -168,6 +177,8 @@ export function UserListPage() {
   const [form, setForm] = useState(initialForm);
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm] = useState(initialForm);
+  const [transferEnabled, setTransferEnabled] = useState(false);
+  const [editTransferEnabled, setEditTransferEnabled] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     userId: "",
     password: "",
@@ -211,15 +222,21 @@ export function UserListPage() {
           : Promise.resolve({ data: [] });
       const [userRes, companyRes] = await Promise.all([userReq, companyReq]);
       setUsers(userRes.data || []);
-      setCompanies(companyRes.data || []);
-      const nextRole = defaultRoleFor(user);
+      const ownCompanyId = user?.company_id || 1;
+      const availableCompanies = companyRes.data || [];
+      const ownCompany = availableCompanies.find((company) => Number(company.company_id) === Number(ownCompanyId));
+      setCompanies([
+        { company_id: ownCompanyId, company_name: Number(ownCompanyId) === 1 ? PORTAL_COMPANY_NAME : ownCompany?.company_name || user?.company_name || "Your company" },
+        ...availableCompanies.filter((company) => Number(company.company_id) !== Number(ownCompanyId)),
+      ]);
+      const nextRole = defaultRoleFor(user, ownCompanyId);
       setForm((current) => ({
         ...current,
         role_id: current.role_id || nextRole,
         ic_role: current.ic_role || defaultIcRoleFor(current.role_id || nextRole),
         company_id:
           user?.role_id === 1 || user?.role_id === 2
-            ? current.company_id || companyRes.data?.[0]?.company_id || ""
+            ? current.company_id || ownCompanyId
             : user?.company_id || "",
       }));
     } catch (err) {
@@ -227,7 +244,7 @@ export function UserListPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, PORTAL_COMPANY_NAME]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -236,14 +253,13 @@ export function UserListPage() {
     return () => window.clearTimeout(timer);
   }, [loadData]);
 
-  const roleOptions = useMemo(
-    () =>
-      (ROLE_CREATE_FLOW[user?.role_id] || []).map((value) => ({
+  const roleOptionsFor = (companyId) =>
+      (ROLE_CREATE_FLOW[user?.role_id] || [])
+      .filter((value) => value !== 1 || (Number(user?.role_id) === 1 && Number(companyId) === 1))
+      .map((value) => ({
         value,
-        label: ROLES[value],
-      })),
-    [user?.role_id],
-  );
+        label: value === 1 ? "Co-Partner" : ROLES[value],
+      }));
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -280,10 +296,11 @@ export function UserListPage() {
         ic_role: defaultIcRoleFor(defaultRoleFor(user)),
         company_id:
           user?.role_id === 1 || user?.role_id === 2
-            ? companies[0]?.company_id || ""
+            ? user?.company_id || 1
             : user?.company_id || "",
       });
       setShowCreate(false);
+      setTransferEnabled(false);
       await loadData();
     } catch (err) {
       setError(apiErrorMessage(err, "Failed to create user."));
@@ -313,9 +330,11 @@ export function UserListPage() {
 
   const startEdit = (target) => {
     setEditingUser(target);
+    setEditTransferEnabled(Boolean(target.transfer_date || target.transfer_branch_name || target.transfer_branch_id));
     setEditForm({
       ...initialForm,
       ...target,
+      employee_status: normalizeEmployeeStatus(target.employee_status),
       date_of_birth: target.date_of_birth || "",
       joining_date: target.joining_date || "",
       resignation_date: target.resignation_date || "",
@@ -511,14 +530,14 @@ export function UserListPage() {
               const nextShowCreate = !showCreate;
               setShowCreate(nextShowCreate);
               if (nextShowCreate) {
-                const nextRole = defaultRoleFor(user);
+                const nextRole = defaultRoleFor(user, form.company_id || user?.company_id || 1);
                 setForm((current) => ({
                   ...current,
                   role_id: nextRole,
                   ic_role: defaultIcRoleFor(nextRole),
                   company_id:
                     user?.role_id === 1 || user?.role_id === 2
-                      ? current.company_id || companies[0]?.company_id || ""
+                      ? current.company_id || user?.company_id || 1
                       : user?.company_id || "",
                 }));
               }
@@ -542,14 +561,62 @@ export function UserListPage() {
       )}
 
       {showCreate && (
-        <form onSubmit={submitCreate} style={panelStyle}>
-          <h2 style={panelTitleStyle}>Create {ROLES[defaultRoleFor(user)] || "User"}</h2>
+        <ValidatedForm error={error} onSubmit={submitCreate} style={panelStyle}>
+          <h2 style={panelTitleStyle}>Create {roleOptionsFor(form.company_id).find((role) => role.value === Number(form.role_id))?.label || "User"}</h2>
+          <div style={formGridStyle}>
+              <label style={labelStyle}>
+                Company
+                <select
+                  required
+                  disabled={![1, 2].includes(Number(user?.role_id))}
+                  value={form.company_id}
+                  onChange={(e) =>
+                    setForm({ ...form, ...clearedBranchFields, company_id: e.target.value, role_id: defaultRoleFor(user, e.target.value), ic_role: "" })
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Select company</option>
+                  {companies.map((company) => (
+                    <option key={company.company_id} value={company.company_id}>
+                      {company.company_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            <label style={labelStyle}>
+              Role
+              <select
+                value={form.role_id}
+                onChange={(e) => {
+                  const nextRole = Number(e.target.value);
+                  setForm({
+                    ...form,
+                    role_id: nextRole,
+                    ic_role: defaultIcRoleFor(nextRole),
+                  });
+                }}
+                style={inputStyle}
+              >
+                {roleOptionsFor(form.company_id).map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div style={sectionLabelStyle}>Personal Information</div>
           <div style={formGridStyle}>
             {personalFields.map(([field, label, type = "text"]) => (
               <label key={field} style={labelStyle}>
                 {label}
-                <input
+                {employeePersonalOptions[field] ? (
+                  <select value={form[field] || ""} onChange={(event) => setForm({ ...form, [field]: event.target.value })} style={inputStyle}>
+                    <option value="">Select {label}</option>
+                    {form[field] && !employeePersonalOptions[field].includes(form[field]) && <option value={form[field]}>{form[field]}</option>}
+                    {employeePersonalOptions[field].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                ) : <input
                   required={[
                     "employee_id",
                     "first_name",
@@ -565,18 +632,34 @@ export function UserListPage() {
                     setForm({ ...form, [field]: e.target.value })
                   }
                   style={inputStyle}
-                />
+                />}
               </label>
             ))}
           </div>
           <div style={sectionLabelStyle}>Employment Details</div>
           <div style={formGridStyle}>
             {employmentFields
+              .filter(([field]) => showEmploymentField(field, form.employee_status))
+              .filter(([field]) => !["transfer_date", "transfer_branch_name", "transfer_branch_id"].includes(field) || transferEnabled)
               .filter(([field]) => field !== "ic_role" || Number(form.role_id) === 3)
               .map(([field, label, type = "text"]) => (
               <label key={field} style={labelStyle}>
                 {label}
-                <input
+                {field === "transfer_enabled" ? (
+                  <input type="checkbox" checked={transferEnabled} onChange={(event) => setTransferEnabled(event.target.checked)} />
+                ) : employeePersonalOptions[field] ? (
+                  <select required={field === "employee_status"} value={form[field] || ""} onChange={(event) => setForm({ ...form, [field]: event.target.value })} style={inputStyle}>
+                    <option value="">Select {label}</option>
+                    {employeePersonalOptions[field].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                ) : ["branch_name", "transfer_branch_name"].includes(field) ? (
+                  <BranchMasterSelect companyId={form.company_id} branchId={field === "branch_name" ? form.branch_id : form.transfer_branch_id}
+                    branchName={form[field]} required={field === "branch_name"} style={inputStyle}
+                    onChange={(branch) => setForm((current) => ({ ...current, ...branchFields(branch, { transfer: field === "transfer_branch_name", userForm: true }) }))} />
+                ) : field === "transfer_location" ? (
+                  <MasterCityInput required value={form[field] || ""} onChange={(value) => setForm({ ...form, [field]: value })} />
+                ) : <input
+                  readOnly={["branch_id", "transfer_branch_id"].includes(field)}
                   required={[
                     "joining_date",
                     "designation",
@@ -592,50 +675,9 @@ export function UserListPage() {
                     setForm({ ...form, [field]: e.target.value })
                   }
                   style={inputStyle}
-                />
+                />}
               </label>
             ))}
-            <label style={labelStyle}>
-              Role
-              <select
-                value={form.role_id}
-                onChange={(e) => {
-                  const nextRole = Number(e.target.value);
-                  setForm({
-                    ...form,
-                    role_id: nextRole,
-                    ic_role: defaultIcRoleFor(nextRole),
-                  });
-                }}
-                style={inputStyle}
-              >
-                {roleOptions.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {(user?.role_id === 1 || user?.role_id === 2) && (
-              <label style={labelStyle}>
-                {user?.role_id === 2 ? "Client Company" : "Company"}
-                <select
-                  required
-                  value={form.company_id}
-                  onChange={(e) =>
-                    setForm({ ...form, company_id: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Select company</option>
-                  {companies.map((company) => (
-                    <option key={company.company_id} value={company.company_id}>
-                      {company.company_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             <label style={labelStyle}>
               Password
               <input
@@ -654,11 +696,11 @@ export function UserListPage() {
           <button type="submit" disabled={saving} style={primaryButtonStyle}>
             {saving ? "Creating..." : "Create User"}
           </button>
-        </form>
+        </ValidatedForm>
       )}
 
       {showPassword && (
-        <form onSubmit={submitPassword} style={panelStyle}>
+        <ValidatedForm error={error} onSubmit={submitPassword} style={panelStyle}>
           <h2 style={panelTitleStyle}>Change User Password</h2>
           <div style={formGridStyle}>
             <label style={labelStyle}>
@@ -698,18 +740,51 @@ export function UserListPage() {
           <button type="submit" disabled={saving} style={primaryButtonStyle}>
             {saving ? "Changing..." : "Change Password"}
           </button>
-        </form>
+        </ValidatedForm>
       )}
 
       {editingUser && (
-        <form onSubmit={submitEdit} style={panelStyle}>
+        <ValidatedForm error={error} onSubmit={submitEdit} style={panelStyle}>
           <h2 style={panelTitleStyle}>Edit User</h2>
+          <div style={formGridStyle}>
+            <label style={labelStyle}>
+              Company
+              <input readOnly value={companies.find((company) => Number(company.company_id) === Number(editForm.company_id))?.company_name || (Number(editForm.company_id) === 1 ? PORTAL_COMPANY_NAME : user?.company_name || "Your company")} style={inputStyle} />
+            </label>
+            <label style={labelStyle}>
+              Role
+              <select
+                value={editForm.role_id}
+                onChange={(e) => {
+                  const nextRole = Number(e.target.value);
+                  setEditForm({
+                    ...editForm,
+                    role_id: nextRole,
+                    ic_role: defaultIcRoleFor(nextRole),
+                  });
+                }}
+                style={inputStyle}
+              >
+                {roleOptionsFor(editForm.company_id).map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div style={sectionLabelStyle}>Personal Information</div>
           <div style={formGridStyle}>
             {personalFields.map(([field, label, type = "text"]) => (
               <label key={field} style={labelStyle}>
                 {label}
-                <input
+                {employeePersonalOptions[field] ? (
+                  <select value={editForm[field] || ""} onChange={(event) => setEditForm({ ...editForm, [field]: event.target.value })} style={inputStyle}>
+                    <option value="">Select {label}</option>
+                    {editForm[field] && !employeePersonalOptions[field].includes(editForm[field]) && <option value={editForm[field]}>{editForm[field]}</option>}
+                    {employeePersonalOptions[field].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                ) : <input
                   required={[
                     "employee_id",
                     "first_name",
@@ -725,18 +800,35 @@ export function UserListPage() {
                     setEditForm({ ...editForm, [field]: e.target.value })
                   }
                   style={inputStyle}
-                />
+                />}
               </label>
             ))}
           </div>
           <div style={sectionLabelStyle}>Employment Details</div>
           <div style={formGridStyle}>
             {employmentFields
+              .filter(([field]) => showEmploymentField(field, editForm.employee_status))
+              .filter(([field]) => !["transfer_date", "transfer_branch_name", "transfer_branch_id"].includes(field) || editTransferEnabled)
               .filter(([field]) => field !== "ic_role" || Number(editForm.role_id) === 3)
               .map(([field, label, type = "text"]) => (
               <label key={field} style={labelStyle}>
                 {label}
-                <input
+                {field === "transfer_enabled" ? (
+                  <input type="checkbox" checked={editTransferEnabled} onChange={(event) => setEditTransferEnabled(event.target.checked)} />
+                ) : employeePersonalOptions[field] ? (
+                  <select required={field === "employee_status"} value={editForm[field] || ""} onChange={(event) => setEditForm({ ...editForm, [field]: event.target.value })} style={inputStyle}>
+                    <option value="">Select {label}</option>
+                    {editForm[field] && !employeePersonalOptions[field].includes(editForm[field]) && <option value={editForm[field]}>{editForm[field]}</option>}
+                    {employeePersonalOptions[field].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                ) : ["branch_name", "transfer_branch_name"].includes(field) ? (
+                  <BranchMasterSelect companyId={editForm.company_id} branchId={field === "branch_name" ? editForm.branch_id : editForm.transfer_branch_id}
+                    branchName={editForm[field]} required={field === "branch_name"} style={inputStyle}
+                    onChange={(branch) => setEditForm((current) => ({ ...current, ...branchFields(branch, { transfer: field === "transfer_branch_name", userForm: true }) }))} />
+                ) : field === "transfer_location" ? (
+                  <MasterCityInput required value={editForm[field] || ""} onChange={(value) => setEditForm({ ...editForm, [field]: value })} />
+                ) : <input
+                  readOnly={["branch_id", "transfer_branch_id"].includes(field)}
                   required={[
                     "joining_date",
                     "designation",
@@ -752,30 +844,9 @@ export function UserListPage() {
                     setEditForm({ ...editForm, [field]: e.target.value })
                   }
                   style={inputStyle}
-                />
+                />}
               </label>
             ))}
-            <label style={labelStyle}>
-              Role
-              <select
-                value={editForm.role_id}
-                onChange={(e) => {
-                  const nextRole = Number(e.target.value);
-                  setEditForm({
-                    ...editForm,
-                    role_id: nextRole,
-                    ic_role: defaultIcRoleFor(nextRole),
-                  });
-                }}
-                style={inputStyle}
-              >
-                {roleOptions.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button type="submit" disabled={saving} style={primaryButtonStyle}>
@@ -789,7 +860,7 @@ export function UserListPage() {
               Cancel
             </button>
           </div>
-        </form>
+        </ValidatedForm>
       )}
 
       <div style={tableWrapStyle}>

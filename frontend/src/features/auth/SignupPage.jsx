@@ -1,3 +1,6 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
+import { useBrandingStore } from "../../store/brandingStore";
+import { PortalBrand } from "../../components/PortalBrand";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +12,7 @@ import { authApi } from "../../api/auth";
 import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { authInputStyle } from "../../styles/formStyles";
 
-const lettersOnly = /^[a-zA-Z\s]+$/;
+const lettersOnly = /^(?=.*\p{L})[\p{L}\p{M} .'’-]+$/u;
 
 const signupSchema = z
   .object({
@@ -80,6 +83,7 @@ const passwordToggleStyle = {
 };
 
 export function SignupPage() {
+  const portalName = useBrandingStore((state) => state.portalName);
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,7 +93,7 @@ export function SignupPage() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(signupSchema),
     mode: "onChange",
@@ -110,22 +114,18 @@ export function SignupPage() {
 
   return (
     <div className="auth-page">
-      <Link to="/" className="auth-brand" aria-label="POSH platform home">
-        <span className="auth-brand-mark">P</span>
-        <span>
-          <strong>POSH</strong>
-          <small>Training Platform</small>
-        </span>
+      <Link to="/" className="auth-brand" aria-label={`${portalName} home`}>
+        <PortalBrand />
       </Link>
 
       <section className="auth-card auth-card-lg">
         <div className="auth-card-header">
           <p className="auth-eyebrow">Client onboarding</p>
           <h1>Create account</h1>
-          <p>Join XYZ Portal and verify your account with OTP.</p>
+          <p>Join {portalName} and verify your account with OTP.</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <ValidatedForm error={error} fieldErrors={errors} onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="auth-form-grid">
             <div>
               <label htmlFor="first_name" style={labelStyle}>
@@ -304,12 +304,12 @@ export function SignupPage() {
 
           <button
             type="submit"
-            disabled={!isValid || loading}
+            disabled={loading}
             className="auth-submit-btn"
           >
             {loading ? "Creating account..." : "Create Account"}
           </button>
-        </form>
+        </ValidatedForm>
 
         <div className="auth-footer-links">
           <span>

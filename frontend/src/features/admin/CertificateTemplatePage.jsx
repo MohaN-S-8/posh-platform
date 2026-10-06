@@ -1,3 +1,4 @@
+import { ValidatedForm } from "../../components/ValidatedForm";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -238,7 +239,7 @@ export function CertificateTemplatePage() {
       {success && <div style={successStyle}>{success}</div>}
 
       {showForm && (
-        <form onSubmit={submitTemplate} className="portal-card" style={{ marginBottom: "20px" }}>
+        <ValidatedForm error={error} onSubmit={submitTemplate} className="portal-card" style={{ marginBottom: "20px" }}>
           <div className="portal-section-title" style={{ marginTop: 0 }}>
             Template Details
           </div>
@@ -286,7 +287,7 @@ export function CertificateTemplatePage() {
           <button type="submit" disabled={saving} style={primaryButtonStyle}>
             {saving ? "Saving..." : "Save Template"}
           </button>
-        </form>
+        </ValidatedForm>
       )}
 
       <div className="portal-card" style={{ marginBottom: "20px" }}>
