@@ -255,6 +255,7 @@ export function UserListPage() {
 
   const roleOptionsFor = (companyId) =>
       (ROLE_CREATE_FLOW[user?.role_id] || [])
+      .filter((value) => Number(companyId) === 1 || [5, 3, 4].includes(value))
       .filter((value) => value !== 1 || (Number(user?.role_id) === 1 && Number(companyId) === 1))
       .map((value) => ({
         value,
